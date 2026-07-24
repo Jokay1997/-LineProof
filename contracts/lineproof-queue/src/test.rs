@@ -1,7 +1,9 @@
-use soroban_sdk::{testutils::Address as _, Address, Env, Symbol, Vec};
+use soroban_sdk::{
+    testutils::{Address as _, Events as _},
+    Address, Env, Symbol, TryFromVal, Vec,
+};
 
-use crate::{AdvancementRule, PositionStatus, QueueConfig, QueueImpl, QueueImplClient, QueueStatus};
-use crate::{AdvancementRule, Position, PositionStatus, Queue, QueueConfig, QueueImpl, QueueImplClient, QueueStatus};
+use crate::{AdvancementRule, Position, PositionStatus, QueueConfig, QueueImpl, QueueImplClient, QueueStatus};
 
 fn setup() -> (Env, Address, Address) {
     let env = Env::default();
@@ -14,7 +16,6 @@ fn setup() -> (Env, Address, Address) {
 fn make_config(env: &Env, admin: &Address) -> QueueConfig {
     QueueConfig {
         slug: Symbol::new(env, "sneaker_drop"),
-        name: Symbol::new(env, "SneakerDrop"),
         name: Symbol::new(env, "Sneaker_Drop"),
         admin: admin.clone(),
         max_positions: 5,
@@ -41,6 +42,50 @@ fn test_initialize_persists_config() {
     let loaded = client.get_config();
     assert_eq!(loaded.max_positions, 5);
     assert_eq!(loaded.version, 1);
+}
+
+#[test]
+fn test_admin_transfer_propose_and_accept() {
+    let (env, admin, contract_id) = setup();
+    let client = QueueImplClient::new(&env, &contract_id);
+    client.initialize(&admin, &make_config(&env, &admin));
+    let new_admin = Address::generate(&env);
+
+    client.propose_admin(&admin, &new_admin);
+    client.accept_admin(&new_admin);
+
+    let event = env.events().all().last().unwrap();
+    assert_eq!(
+        Symbol::try_from_val(&env, &event.1.get(1).unwrap()).unwrap(),
+        Symbol::new(&env, "OwnershipTransferred")
+    );
+    assert_eq!(client.get_config().admin, new_admin);
+}
+
+#[test]
+#[should_panic(expected = "not_pending_admin")]
+fn test_admin_transfer_rejects_wrong_pending_admin() {
+    let (env, admin, contract_id) = setup();
+    let client = QueueImplClient::new(&env, &contract_id);
+    client.initialize(&admin, &make_config(&env, &admin));
+    client.propose_admin(&admin, &Address::generate(&env));
+
+    client.accept_admin(&Address::generate(&env));
+}
+
+#[test]
+fn test_admin_transfer_proposal_overwrites_pending() {
+    let (env, admin, contract_id) = setup();
+    let client = QueueImplClient::new(&env, &contract_id);
+    client.initialize(&admin, &make_config(&env, &admin));
+    let first = Address::generate(&env);
+    let second = Address::generate(&env);
+
+    client.propose_admin(&admin, &first);
+    client.propose_admin(&admin, &second);
+    client.accept_admin(&second);
+
+    assert_eq!(client.get_config().admin, second);
 }
 
 #[test]
@@ -136,13 +181,19 @@ fn test_advance_updates_positions() {
     assert_eq!(advanced.len(), 2);
 
     let loaded1: Position = env.as_contract(&contract_id, || {
-        env.storage().persistent().get(&(Symbol::new(&env, "pos"), 1u32)).unwrap()
+        env.storage()
+            .persistent()
+            .get(&(Symbol::new(&env, "pos"), 1u32))
+            .unwrap()
     });
     assert!(matches!(loaded1.status, PositionStatus::Advanced));
     assert!(loaded1.advanced_at.is_some());
 
     let loaded2: Position = env.as_contract(&contract_id, || {
-        env.storage().persistent().get(&(Symbol::new(&env, "pos"), 2u32)).unwrap()
+        env.storage()
+            .persistent()
+            .get(&(Symbol::new(&env, "pos"), 2u32))
+            .unwrap()
     });
     assert!(matches!(loaded2.status, PositionStatus::Advanced));
 }
@@ -443,6 +494,9 @@ fn test_advance_empty_queue_returns_empty_vec() {
     let result = client.advance(&admin, &5);
     assert_eq!(result.len(), 0);
     assert_eq!(client.current_position_index(), 0);
+}
+
+#[test]
 fn test_expire_position() {
     let (env, admin, contract_id) = setup();
     let config = make_config(&env, &admin);
