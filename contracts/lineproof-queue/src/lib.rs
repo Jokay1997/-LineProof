@@ -1,9 +1,13 @@
-use soroban_sdk::{contract, contractimpl, contracttype, Address, Env, Symbol, Vec};
+use soroban_sdk::{contract, contractimpl, contracttype, Address, BytesN, Env, Symbol, Vec};
 
 /// TTL threshold: renew if remaining TTL is below this many ledgers (~13.8 hours at 5s/ledger)
 const TTL_THRESHOLD: u32 = 10_000;
 /// TTL extension target: extend to this many ledgers (~1 year at 5s/ledger)
 const TTL_EXTEND_TO: u32 = 6_307_200;
+/// Current version of the queue contract - stored in instance storage
+const CURRENT_VERSION: u32 = 1;
+/// Storage key for the contract version
+const VERSION_KEY: &str = "version";
 
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -71,6 +75,8 @@ pub trait Queue {
     fn expire_position(env: Env, admin: Address, position_id: u32);
     fn expire_positions_batch(env: Env, admin: Address, position_ids: Vec<u32>);
     fn close(env: Env, admin: Address);
+    fn upgrade(env: Env, admin: Address, new_wasm_hash: BytesN<32>);
+    fn migrate(env: Env, admin: Address, from_version: u32, to_version: u32);
 }
 
 #[contract]
@@ -94,10 +100,15 @@ impl QueueImpl {
         env.storage()
             .persistent()
             .extend_ttl(&key_idx, TTL_THRESHOLD, TTL_EXTEND_TO);
+        // Store the current version for tracking upgrades
+        let version_key = Symbol::new(&env, VERSION_KEY);
+        env.storage().persistent().set(&version_key, &CURRENT_VERSION);
+        env.storage()
+            .persistent()
+            .extend_ttl(&version_key, TTL_THRESHOLD, TTL_EXTEND_TO);
         env.storage()
             .persistent()
             .extend_ttl(&env.current_contract_address(), TTL_THRESHOLD, TTL_EXTEND_TO);
-        env.storage().persistent().extend_ttl(&key_idx, TTL_THRESHOLD, TTL_EXTEND_TO);
         env.storage().instance().extend_ttl(TTL_THRESHOLD, TTL_EXTEND_TO);
         emit(&env, Symbol::new(&env, "Initialized"), 0, &admin, 0);
     }
@@ -373,6 +384,67 @@ impl QueueImpl {
                 env.ledger().timestamp(),
             );
         }
+    }
+
+    pub fn upgrade(env: Env, admin: Address, _new_wasm_hash: BytesN<32>) {
+        admin.require_auth();
+        let config = Self::get_config_internal(&env);
+        if config.admin != admin {
+            panic!("unauthorized: only queue admin can upgrade");
+        }
+        // Note: The actual WASM upgrade is performed by the factory contract
+        // using env.deployer().with_current_contract(&new_wasm_hash).upgrade(&contract_id).
+        // This function serves as an authorization checkpoint and event beacon
+        // that the contract version is being upgraded.
+        emit(
+            &env,
+            Symbol::new(&env, "Upgraded"),
+            0,
+            &admin,
+            env.ledger().timestamp(),
+        );
+    }
+
+    pub fn migrate(env: Env, admin: Address, from_version: u32, to_version: u32) {
+        admin.require_auth();
+        let config = Self::get_config_internal(&env);
+        if config.admin != admin {
+            panic!("unauthorized: only queue admin can migrate");
+        }
+        let version_key = Symbol::new(&env, VERSION_KEY);
+        let stored_version: u32 = env
+            .storage()
+            .persistent()
+            .get(&version_key)
+            .unwrap_or(CURRENT_VERSION);
+        if stored_version != from_version {
+            panic!("version mismatch: stored version does not match from_version");
+        }
+        // Validate version progression
+        if to_version <= from_version {
+            panic!("to_version must be greater than from_version");
+        }
+        // Apply version-specific migrations
+        // This is a skeleton that can be extended with actual storage transformations
+        // as the contract evolves in future versions.
+        match (from_version, to_version) {
+            // Example: (1, 2) would handle v1 -> v2 migration
+            _ => {
+                // No migration logic needed for current version transition
+            }
+        }
+        // Update stored version
+        env.storage().persistent().set(&version_key, &to_version);
+        env.storage()
+            .persistent()
+            .extend_ttl(&version_key, TTL_THRESHOLD, TTL_EXTEND_TO);
+        emit(
+            &env,
+            Symbol::new(&env, "Migrated"),
+            from_version,
+            &admin,
+            to_version as u64,
+        );
     }
 }
 
