@@ -4,11 +4,11 @@ RUN corepack enable && corepack prepare pnpm@9 --activate
 WORKDIR /repo
 
 FROM base AS deps
-COPY pnpm-workspace.yaml package.json ./
+COPY pnpm-workspace.yaml pnpm-lock.yaml package.json ./
 COPY sdk/package.json ./sdk/
 COPY backend/package.json ./backend/
 COPY frontend/package.json ./frontend/
-RUN pnpm install --no-frozen-lockfile --filter @lineproof/frontend...
+RUN pnpm install --frozen-lockfile --filter @lineproof/frontend...
 
 FROM deps AS build
 ARG VITE_API_BASE_URL=http://localhost:4000/api

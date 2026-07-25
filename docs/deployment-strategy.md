@@ -60,5 +60,12 @@ Smart contract deployments are not rolled back like web services. If a contract 
 1. Pause new queues when the contract supports pausing.
 2. Publish an advisory with affected contract IDs.
 3. Deploy a fixed implementation.
-4. Migrate only state that has an explicit, audited migration path.
 5. Preserve historical event logs for auditability.
+
+## Container Security
+
+Production container deployments must adhere to the following security baselines:
+- **Non-root Execution:** Both backend and frontend containers must run as a non-root user (e.g., `lineproof` or `nginx`). The Dockerfile `USER` directive is mandatory.
+- **Reproducible Builds:** Dependency installation in CI and Docker builds must use a frozen lockfile (`pnpm install --frozen-lockfile`) to prevent drift and transitive dependency attacks.
+- **Health Checks:** Containers must implement a `HEALTHCHECK` directive that utilizes built-in runtime tools (e.g., Node.js `http.get` instead of `wget` or `curl`) to ensure orchestration layers accurately monitor liveness.
+- **Minimal Surface:** The final runtime stages must omit build dependencies, test suites, and package managers where possible.
