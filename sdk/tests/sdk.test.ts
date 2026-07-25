@@ -103,6 +103,8 @@ describe('QueueClient', () => {
     const client = new LineProofClient({ rpcServerUrl: 'http://localhost:8000', networkPassphrase: TEST_NET });
     const queue = new QueueClient(client, { queueContractId: 'CQUEUE123' });
     await expect(queue.getPosition(0)).rejects.toThrow('INVALID_INPUT');
+  });
+
   it('getPosition parses position from simulateTransaction', async () => {
     const client = new LineProofClient({ rpcServerUrl: 'http://localhost:8000', networkPassphrase: TEST_NET });
     const { xdr } = await import('@stellar/stellar-sdk');

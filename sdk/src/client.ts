@@ -4,37 +4,30 @@ import {
   SorobanRpc,
   TransactionBuilder,
   BASE_FEE,
-} from '@stellar/stellar-sdk';
-
-import { LineProofConfig, DEFAULT_LINEPROOF_CONFIG, SDKError, isNetworkPassphrase } from './types.js';
-
   xdr,
   Address,
   Operation,
-} from '@stellar/stellar-sdk';
-import { LineProofConfig, DEFAULT_LINEPROOF_CONFIG, SDKError, isNetworkPassphrase, resolveEndpoints } from './types.js';
-import { paginate, decodeCursor, type Page } from './pagination.js';
-import { deserializeContractEvent, type RawContractEventLike, type EventFilter, type AnyLineProofEvent } from './events.js';
   StrKey,
+  Account,
 } from '@stellar/stellar-sdk';
 import { createHash } from 'crypto';
+
 import {
   LineProofConfig,
   DEFAULT_LINEPROOF_CONFIG,
   SDKError,
   isNetworkPassphrase,
-} from "./types.js";
+  resolveEndpoints,
+  validateContractId,
+} from './types.js';
+import { paginate, decodeCursor, type Page } from './pagination.js';
+import { deserializeContractEvent, type RawContractEventLike, type EventFilter, type AnyLineProofEvent } from './events.js';
 import {
   withRetry,
-  RetryResult,
   RetryConfig,
   DEFAULT_RETRY_CONFIG,
   OnRetryFn,
-} from "./utils.js";
-  validateContractId,
-} from './types.js';
-} from '@stellar/stellar-sdk';
-import { LineProofConfig, DEFAULT_LINEPROOF_CONFIG, SDKError, isNetworkPassphrase } from './types.js';
+} from './utils.js';
 
 // Neutral all-zeros account used as the source for simulation-only (read)
 // transactions, where no signature and no real sequence number are needed.
@@ -87,12 +80,6 @@ export class LineProofClient {
     this.server = new Horizon.Server(horizonUrl.replace(/\/rpc.*/, ''));
     // SorobanRpc.Server for Soroban contract operations
     this.sorobanServer = new SorobanRpc.Server(sorobanRpcUrl);
-    this.server = new Horizon.Server(
-      resolved.rpcServerUrl.replace(/\/rpc.*/, ''),
-    );
-    // SorobanRpc.Server for Soroban contract operations (preserves /rpc path)
-    const sorobanUrl = resolved.sorobanRpcUrl || resolved.rpcServerUrl;
-    this.sorobanServer = new SorobanRpc.Server(sorobanUrl);
   }
 
   /**
@@ -185,8 +172,7 @@ export class LineProofClient {
   async deployFactory(wasmBytes?: Uint8Array): Promise<string> {
     const keypair = this.requireKeypair();
     await this.server.loadAccount(keypair.publicKey());
-    const contractId = 'C' + Keypair.random().publicKey().slice(1);
-
+    
     const bytesToDeploy = wasmBytes ?? new Uint8Array([0x00, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00]);
     const wasmHash = await this.uploadWasm(bytesToDeploy);
     const contractId = await this.installContract(wasmHash);
@@ -280,27 +266,6 @@ export class LineProofClient {
     );
 
     return retryResult.result;
-    operation: Parameters<TransactionBuilder['addOperation']>[0],
-  ): Promise<string> {
-    const keypair = this.requireKeypair();
-    const source = await this.sorobanServer.getAccount(keypair.publicKey());
-    const transaction = new TransactionBuilder(source, {
-      fee: BASE_FEE,
-      networkPassphrase: this.networkPassphrase,
-    })
-      .addOperation(operation)
-      .setTimeout(30)
-      .build();
-    const prepared = await this.sorobanServer.prepareTransaction(transaction);
-    prepared.sign(keypair);
-    const result = await this.sorobanServer.sendTransaction(prepared);
-    if (result.status === 'ERROR') {
-      throw new SDKError(
-        'TRANSACTION_FAILED',
-        'Soroban RPC rejected the transaction',
-      );
-    }
-    return result.hash;
   }
 
   resolveFactory(): string {
@@ -321,10 +286,6 @@ export class LineProofClient {
   ): Promise<xdr.ScVal> {
     const source = this.simulationSource();
     validateContractId(contractId);
-    const source = new Account(
-      'GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF',
-      '0',
-    );
     const tx = new TransactionBuilder(source, {
       fee: BASE_FEE,
       networkPassphrase: this.networkPassphrase,
@@ -362,8 +323,6 @@ export class LineProofClient {
     if (!response.entries || response.entries.length === 0) {
       return undefined;
     }
-    const entryXdr = response.entries[0].xdr;
-    const ledgerEntryData = xdr.LedgerEntryData.fromXDR(entryXdr, 'base64');
     const entryXdr = (response.entries[0] as any).xdr;
     const ledgerEntryData = xdr.LedgerEntryData.fromXDR(entryXdr, "base64");
     return ledgerEntryData.contractData().val();
@@ -460,6 +419,5 @@ export class LineProofClient {
     config: Omit<LineProofConfig, 'privateKey'>,
   ): LineProofClient {
     return new LineProofClient({ ...config });
-    return new LineProofClient(config as LineProofConfig);
   }
 }

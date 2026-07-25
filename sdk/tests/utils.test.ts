@@ -245,14 +245,14 @@ describe('createTimeoutPromise', () => {
   it('rejects after specified timeout', async () => {
     const promise = createTimeoutPromise(1000);
     vi.advanceTimersByTime(1000);
-    await expect(promise).rejects.toThrow('timed out after 1000ms');
+    await expect(promise).rejects.toThrow('Transaction submission timed out after 1000ms');
   });
 
   it('rejects immediately when signal is aborted', async () => {
     const controller = new AbortController();
     const promise = createTimeoutPromise(10000, controller.signal);
     controller.abort();
-    await expect(promise).rejects.toThrow('aborted');
+    await expect(promise).rejects.toThrow('Transaction submission aborted');
   });
 });
 
