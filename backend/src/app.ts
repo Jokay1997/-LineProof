@@ -7,14 +7,17 @@ import queueRoutes from './routes/queues.js';
 import enrollmentRoutes from './routes/enrollments.js';
 import escrowRoutes from './routes/escrow.js';
 import publicRoutes from './routes/public.js';
+import webhookRoutes from './routes/webhooks.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import { readLimiter, enrollmentLimiter, escrowLimiter } from './middleware/rateLimiter.js';
 import { requestId } from './middleware/requestId.js';
 import { requestLogger } from './middleware/requestLogger.js';
 import { register, METRICS_CONTENT_TYPE } from './metrics/registry.js';
 import { healthPayload } from './health.js';
+import { startWebhookDispatcher } from './services/webhookDispatcher.js';
 
 export function createApp(): Express {
+  startWebhookDispatcher();
   const app: Express = express();
 
   const allowedOrigins = (process.env.CORS_ORIGINS ?? 'http://localhost:5173')
@@ -59,6 +62,11 @@ export function createApp(): Express {
   app.use('/api/enrollments', enrollmentLimiter, enrollmentRoutes);
   app.use('/api/escrow', escrowLimiter, escrowRoutes);
   app.use('/public', readLimiter, publicRoutes);
+  app.use('/api/queues', queueRoutes);
+  app.use('/api/enrollments', writeRateLimiter, enrollmentRoutes);
+  app.use('/api/escrow', writeRateLimiter, escrowRoutes);
+  app.use('/api/webhooks', webhookRoutes);
+  app.use('/public', publicRoutes);
 
   app.use(errorHandler);
   
