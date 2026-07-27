@@ -4,13 +4,13 @@ LineProof testing should prove that fairness, escrow, and identity invariants ho
 
 ## Test Layers
 
-| Layer | Location | Purpose |
-|-------|----------|---------|
-| Contract unit tests | `contracts/*/src/test.rs` | Validate individual Soroban contract behavior. |
-| Contract integration tests | `contracts/` workspace | Validate queue, enrollment, identity, and escrow interactions. |
-| SDK tests | `sdk/tests/` | Validate typed client behavior and public API expectations. |
-| Reference app tests | `frontend/`, `backend/` | Validate UI/API behavior without redefining protocol guarantees. |
-| End-to-end examples | `examples/` | Validate realistic domain flows against localnet. |
+| Layer                      | Location                  | Purpose                                                          |
+| -------------------------- | ------------------------- | ---------------------------------------------------------------- |
+| Contract unit tests        | `contracts/*/src/test.rs` | Validate individual Soroban contract behavior.                   |
+| Contract integration tests | `contracts/` workspace    | Validate queue, enrollment, identity, and escrow interactions.   |
+| SDK tests                  | `sdk/tests/`              | Validate typed client behavior and public API expectations.      |
+| Reference app tests        | `frontend/`, `backend/`   | Validate UI/API behavior without redefining protocol guarantees. |
+| End-to-end examples        | `examples/`               | Validate realistic domain flows against localnet.                |
 
 ## Required Invariants
 
@@ -49,6 +49,14 @@ Localnet tests should verify real transaction construction, event decoding, cont
 ## CI Expectations
 
 Pull requests should run formatting, linting, contract tests, SDK tests, and security scans. Documentation-only changes may skip expensive integration jobs if CI supports path filters, but changes to contracts, SDK types, deployment scripts, or examples should run the full suite.
+
+### Coverage Enforcement
+
+- **Backend**: Minimum 65% lines, 65% functions, 55% branches, 65% statements
+- **SDK**: Minimum 60% lines, 60% functions, 50% branches, 60% statements
+- Coverage is measured and enforced on every CI run via `pnpm test:coverage`
+- PRs that reduce coverage below thresholds will fail CI
+- Coverage reports are generated as LCOV and HTML artifacts for inspection
 
 ## Release Criteria
 

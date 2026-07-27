@@ -15,9 +15,12 @@ export class IdentityClient {
   private readonly client: LineProofClient;
   private readonly contractId?: string;
 
-  constructor(client: LineProofClient, options?: IdentityClientOptions | string) {
+  constructor(
+    client: LineProofClient,
+    options?: IdentityClientOptions | string,
+  ) {
     this.client = client;
-    if (typeof options === 'string') {
+    if (typeof options === "string") {
       validateContractId(options);
       this.contractId = options;
     } else if (options?.contractId) {
@@ -35,13 +38,13 @@ export class IdentityClient {
   async bindIdentity(queueId: string, identity: string, onRetry?: OnRetryFn): Promise<string> {
     const targetId = queueId || this.contractId || '';
     validateContractId(targetId);
-    if (!identity || typeof identity !== 'string') {
-      throw new SDKError('INVALID_IDENTITY', 'Identity public key is required');
+    if (!identity || typeof identity !== "string") {
+      throw new SDKError("INVALID_IDENTITY", "Identity public key is required");
     }
     return this.client.submitSorobanOperation(
       Operation.invokeContractFunction({
         contract: targetId,
-        function: 'bind',
+        function: "bind",
         args: [],
       }),
       onRetry,
@@ -49,7 +52,7 @@ export class IdentityClient {
   }
 
   async isBound(queueId: string, identity: string): Promise<boolean> {
-    const targetId = queueId || this.contractId || '';
+    const targetId = queueId || this.contractId || "";
     validateContractId(targetId);
     const resultXdr = await this.client.simulateContractCall(targetId, 'is_bound', [
       new Address(identity).toScVal(),
@@ -57,8 +60,8 @@ export class IdentityClient {
     ]);
     if (resultXdr.switch().name !== 'scvBool') {
       throw new SDKError(
-        'INVALID_RESPONSE',
-        'Expected Bool response from contract',
+        "INVALID_RESPONSE",
+        "Expected Bool response from contract",
       );
     }
     return resultXdr.b();
@@ -70,8 +73,8 @@ export class IdentityClient {
     queueId: string,
   ): Promise<void> {
     throw new SDKError(
-      'TRANSFER_DISABLED',
-      'Transfer attempts are reverted by the protocol',
+      "TRANSFER_DISABLED",
+      "Transfer attempts are reverted by the protocol",
       { from, to },
     );
   }
