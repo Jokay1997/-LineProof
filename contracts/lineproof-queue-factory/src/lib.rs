@@ -6,8 +6,6 @@ const QUEUE_REGISTRY_PREFIX: &str = "queue";
 const SLUG_INDEX_KEY: &str = "slug_idx";
 /// Storage key prefix for approved queue WASM hashes, keyed by version.
 const APPROVED_HASH_PREFIX: &str = "approved";
-/// Storage key prefix for version-to-WASM-hash approvals.
-const APPROVED_HASH_PREFIX: &str = "approved";
 /// Set after the first hash approval, preserving compatibility until then.
 const APPROVED_REGISTRY_ENABLED_KEY: &str = "approvals";
 
@@ -51,7 +49,6 @@ pub trait QueueFactory {
     fn deactivate_queue(env: Env, admin: Address, slug: Symbol);
     fn reactivate_queue(env: Env, admin: Address, slug: Symbol);
     fn destroy_queue(env: Env, admin: Address, slug: Symbol);
-    fn register_approved_hash(env: Env, admin: Address, version: u32, wasm_hash: BytesN<32>);
     fn set_config(env: Env, admin: Address, min_version: u32, max_version: u32);
     fn get_queue(env: Env, slug: Symbol) -> Option<QueueMetadata>;
     fn list_queues(env: Env) -> Vec<Symbol>;
@@ -178,15 +175,6 @@ impl QueueFactory for QueueFactoryImpl {
         );
     }
 
-    fn register_approved_hash(env: Env, admin: Address, version: u32, wasm_hash: BytesN<32>) {
-        Self::require_admin(&env, &admin);
-        let key = Self::approved_hash_key(&env, version);
-        env.storage().persistent().set(&key, &wasm_hash);
-        env.storage()
-            .persistent()
-            .extend_ttl(&key, TTL_THRESHOLD, TTL_EXTEND_TO);
-    }
-
     fn deactivate_queue(env: Env, admin: Address, slug: Symbol) {
         Self::require_admin(&env, &admin);
         let mut metadata = Self::get_queue_meta(&env, &slug);
@@ -248,20 +236,6 @@ impl QueueFactory for QueueFactoryImpl {
             metadata.version,
             env.ledger().timestamp(),
         );
-    }
-
-    fn register_approved_hash(env: Env, admin: Address, version: u32, wasm_hash: BytesN<32>) {
-        Self::require_admin(&env, &admin);
-        let key = Self::approved_hash_key(&env, version);
-        env.storage().persistent().set(&key, &wasm_hash);
-        env.storage()
-            .persistent()
-            .extend_ttl(&key, TTL_THRESHOLD, TTL_EXTEND_TO);
-        let enabled_key = Symbol::new(&env, APPROVED_REGISTRY_ENABLED_KEY);
-        env.storage().persistent().set(&enabled_key, &true);
-        env.storage()
-            .persistent()
-            .extend_ttl(&enabled_key, TTL_THRESHOLD, TTL_EXTEND_TO);
     }
 
     fn set_config(env: Env, admin: Address, min_version: u32, max_version: u32) {
