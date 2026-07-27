@@ -129,9 +129,9 @@ describe('withRetry', () => {
     (networkError as any).code = 'ECONNRESET';
     const fn = vi.fn().mockRejectedValue(networkError);
 
-    const promise = withRetry(fn, { maxRetries: 2, timeoutMs: 5000, baseDelayMs: 10, jitterFactor: 0 });
-    await vi.advanceTimersByTimeAsync(1000);
-    await expect(promise).rejects.toThrow('Connection reset');
+    await expect(
+      withRetry(fn, { maxRetries: 2, timeoutMs: 5000, baseDelayMs: 10, jitterFactor: 0 })
+    ).rejects.toThrow('Connection reset');
     expect(fn).toHaveBeenCalledTimes(3);
   });
 

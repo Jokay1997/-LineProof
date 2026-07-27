@@ -69,10 +69,6 @@ export class IdentityClient {
     to: string,
     queueId: string,
   ): Promise<void> {
-    const targetId = queueId || this.contractId || '';
-    if (targetId) {
-      validateContractId(targetId);
-    }
     throw new SDKError(
       'TRANSFER_DISABLED',
       'Transfer attempts are reverted by the protocol',

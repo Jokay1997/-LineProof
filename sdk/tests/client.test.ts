@@ -8,7 +8,11 @@ vi.mock('@stellar/stellar-sdk', async (importOriginal) => {
     ...actual,
     Horizon: {
       Server: vi.fn(() => ({
-        loadAccount: vi.fn(async () => ({ sequence: 1, balances: [] })),
+        loadAccount: vi.fn(async () => ({ 
+          sequence: 1, 
+          balances: [],
+          accountId: () => 'GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF',
+        })),
         submitTransaction: vi.fn(async () => ({ hash: 'mockhash' })),
       })),
     },

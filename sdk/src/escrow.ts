@@ -38,11 +38,11 @@ export class EscrowClient {
     _asset: string,
     onRetry?: OnRetryFn,
   ): Promise<string> {
-    const targetId = escrowContractId || this.contractId || '';
-    validateContractId(targetId);
     if (amount <= 0) {
       throw new SDKError('INVALID_INPUT', 'deposit amount must be positive');
     }
+    const targetId = escrowContractId || this.contractId || '';
+    validateContractId(targetId);
     return this.client.submitSorobanOperation(
       Operation.invokeContractFunction({
         contract: targetId,
