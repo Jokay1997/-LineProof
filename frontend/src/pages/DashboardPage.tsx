@@ -4,7 +4,6 @@ import Spinner from '../components/Spinner';
 import EmptyState from '../components/EmptyState';
 import CopyButton from '../components/CopyButton';
 import AlertBanner from '../components/AlertBanner';
-import LiveRegion from '../components/LiveRegion';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:4000/api';
 

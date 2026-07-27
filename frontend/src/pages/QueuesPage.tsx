@@ -7,7 +7,6 @@ import Skeleton from '../components/Skeleton';
 import Spinner from '../components/Spinner';
 import LiveRegion from '../components/LiveRegion';
 import EmptyState from '../components/EmptyState';
-import AlertBanner from '../components/AlertBanner';
 import { useEffect, useRef } from 'react';
 
 export default function QueuesPage() {
