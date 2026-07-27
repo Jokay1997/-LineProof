@@ -337,10 +337,6 @@ impl QueueFactory for QueueFactoryImpl {
 impl QueueFactoryImpl {
     fn require_admin(env: &Env, admin: &Address) {
         admin.require_auth();
-        let config_key = Symbol::new(env, "config");
-        let config: FactoryConfig = env.storage().persistent().get(&config_key).unwrap();
-        if config.admin != *admin {
-            panic!("unauthorized admin");
         let config: FactoryConfig = env
             .storage()
             .persistent()
@@ -364,6 +360,9 @@ impl QueueFactoryImpl {
             env.storage()
                 .persistent()
                 .extend_ttl(&key, TTL_THRESHOLD, TTL_EXTEND_TO);
+        }
+    }
+
     fn require_approved_hash(env: &Env, version: u32, wasm_hash: &BytesN<32>) {
         let enabled_key = Symbol::new(env, APPROVED_REGISTRY_ENABLED_KEY);
         if !env.storage().persistent().get::<_, bool>(&enabled_key).unwrap_or(false) {
@@ -437,6 +436,7 @@ impl QueueFactoryImpl {
 fn emit(env: &Env, kind: Symbol, slug: Symbol, _contract_id: BytesN<32>, version: u32, _timestamp: u64) {
     env.events()
         .publish((Symbol::new(env, "lineproof.factory"), kind, slug, version));
+    env.events()
         .publish((Symbol::new(env, "lineproof_factory"), kind, slug, version), ());
 }
 

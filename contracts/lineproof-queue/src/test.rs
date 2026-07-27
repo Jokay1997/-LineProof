@@ -1,7 +1,7 @@
 use soroban_sdk::{testutils::Address as _, Address, Env, Symbol, Vec};
 
-use crate::{AdvancementRule, PositionStatus, QueueConfig, QueueImpl, QueueImplClient, QueueStatus};
 use crate::{AdvancementRule, Position, PositionStatus, Queue, QueueConfig, QueueImpl, QueueImplClient, QueueStatus};
+use crate::{AdvancementRule, PositionStatus, QueueConfig, QueueImpl, QueueImplClient, QueueStatus};
 
 fn setup() -> (Env, Address, Address) {
     let env = Env::default();
@@ -136,13 +136,19 @@ fn test_advance_updates_positions() {
     assert_eq!(advanced.len(), 2);
 
     let loaded1: Position = env.as_contract(&contract_id, || {
-        env.storage().persistent().get(&(Symbol::new(&env, "pos"), 1u32)).unwrap()
+        env.storage()
+            .persistent()
+            .get(&(Symbol::new(&env, "pos"), 1u32))
+            .unwrap()
     });
     assert!(matches!(loaded1.status, PositionStatus::Advanced));
     assert!(loaded1.advanced_at.is_some());
 
     let loaded2: Position = env.as_contract(&contract_id, || {
-        env.storage().persistent().get(&(Symbol::new(&env, "pos"), 2u32)).unwrap()
+        env.storage()
+            .persistent()
+            .get(&(Symbol::new(&env, "pos"), 2u32))
+            .unwrap()
     });
     assert!(matches!(loaded2.status, PositionStatus::Advanced));
 }
@@ -443,6 +449,9 @@ fn test_advance_empty_queue_returns_empty_vec() {
     let result = client.advance(&admin, &5);
     assert_eq!(result.len(), 0);
     assert_eq!(client.current_position_index(), 0);
+}
+
+#[test]
 fn test_expire_position() {
     let (env, admin, contract_id) = setup();
     let config = make_config(&env, &admin);
