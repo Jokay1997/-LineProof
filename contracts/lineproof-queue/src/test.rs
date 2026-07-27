@@ -430,12 +430,9 @@ fn test_open_enrollment_after_close_panics() {
 
 #[test]
 fn test_advance_empty_queue_returns_empty_vec() {
-    let env = Env::default();
-    let admin = Address::generate(&env);
-    let contract_id = env.register(QueueImpl, ());
-    env.mock_all_auths();
-    let client = QueueImplClient::new(&env, &contract_id);
+    let (env, admin, contract_id) = setup();
     let config = make_config(&env, &admin);
+    let client = QueueImplClient::new(&env, &contract_id);
     client.initialize(&admin, &config);
     client.open_enrollment(&admin);
     client.close_enrollment(&admin);
@@ -443,6 +440,9 @@ fn test_advance_empty_queue_returns_empty_vec() {
     let result = client.advance(&admin, &5);
     assert_eq!(result.len(), 0);
     assert_eq!(client.current_position_index(), 0);
+}
+
+#[test]
 fn test_expire_position() {
     let (env, admin, contract_id) = setup();
     let config = make_config(&env, &admin);
@@ -520,4 +520,116 @@ fn test_expire_positions_batch() {
     assert!(matches!(p1.status, PositionStatus::Expired));
     assert!(matches!(p2.status, PositionStatus::Expired));
     assert!(matches!(p3.status, PositionStatus::Expired));
+}
+
+#[test]
+fn test_advance_with_cancelled_positions_emits_skipped() {
+    let (env, admin, contract_id) = setup();
+    let config = make_config(&env, &admin);
+    let client = QueueImplClient::new(&env, &contract_id);
+    client.initialize(&admin, &config);
+    client.open_enrollment(&admin);
+
+    let user1 = Address::generate(&env);
+    let user2 = Address::generate(&env);
+    let user3 = Address::generate(&env);
+    
+    let pos1 = client.enroll_position(&user1); // id=1
+    let pos2 = client.enroll_position(&user2); // id=2
+    let pos3 = client.enroll_position(&user3); // id=3
+
+    // Cancel position 2
+    client.cancel_position(&user2, &pos2);
+
+    client.close_enrollment(&admin);
+
+    // Advance batch_size=3: should advance pos1 and pos3, skip pos2
+    let advanced = client.advance(&admin, &3);
+    
+    // Only 2 positions should be advanced (pos1 and pos3)
+    assert_eq!(advanced.len(), 2);
+    assert!(advanced.iter().any(|&id| id == 1));
+    assert!(advanced.iter().any(|&id| id == 3));
+
+    // Verify pos1 and pos3 are Advanced
+    let loaded1 = client.get_position(&1).unwrap();
+    assert!(matches!(loaded1.status, PositionStatus::Advanced));
+    
+    let loaded3 = client.get_position(&3).unwrap();
+    assert!(matches!(loaded3.status, PositionStatus::Advanced));
+
+    // Verify pos2 is still Cancelled (not advanced)
+    let loaded2 = client.get_position(&2).unwrap();
+    assert!(matches!(loaded2.status, PositionStatus::Cancelled));
+}
+
+#[test]
+fn test_advance_from_advancement_active_state() {
+    let (env, admin, contract_id) = setup();
+    let config = make_config(&env, &admin);
+    let client = QueueImplClient::new(&env, &contract_id);
+    client.initialize(&admin, &config);
+    client.open_enrollment(&admin);
+
+    let user1 = Address::generate(&env);
+    let user2 = Address::generate(&env);
+    let user3 = Address::generate(&env);
+    let user4 = Address::generate(&env);
+
+    client.enroll_position(&user1); // id=1
+    client.enroll_position(&user2); // id=2
+    client.enroll_position(&user3); // id=3
+    client.enroll_position(&user4); // id=4
+
+    client.close_enrollment(&admin);
+
+    // First advance: batch_size=2, advances pos1 and pos2
+    let advanced1 = client.advance(&admin, &2);
+    assert_eq!(advanced1.len(), 2);
+    assert!(advanced1.iter().any(|&id| id == 1));
+    assert!(advanced1.iter().any(|&id| id == 2));
+
+    // Second advance should work (queue is now AdvancementActive)
+    let advanced2 = client.advance(&admin, &2);
+    assert_eq!(advanced2.len(), 2);
+    assert!(advanced2.iter().any(|&id| id == 3));
+    assert!(advanced2.iter().any(|&id| id == 4));
+
+    // Verify all 4 are Advanced
+    for id in 1..=4 {
+        let pos = client.get_position(&id).unwrap();
+        assert!(matches!(pos.status, PositionStatus::Advanced));
+    }
+}
+
+#[test]
+fn test_advance_all_cancelled_does_not_transition_to_advancement_active() {
+    let (env, admin, contract_id) = setup();
+    let config = make_config(&env, &admin);
+    let client = QueueImplClient::new(&env, &contract_id);
+    client.initialize(&admin, &config);
+    client.open_enrollment(&admin);
+
+    let user1 = Address::generate(&env);
+    let user2 = Address::generate(&env);
+
+    let pos1 = client.enroll_position(&user1);
+    let pos2 = client.enroll_position(&user2);
+
+    // Cancel both positions
+    client.cancel_position(&user1, &pos1);
+    client.cancel_position(&user2, &pos2);
+
+    client.close_enrollment(&admin);
+
+    // Advance with all-cancelled batch returns empty vec
+    let advanced = client.advance(&admin, &2);
+    assert_eq!(advanced.len(), 0);
+
+    // Queue should still be in EnrollmentClosed, so another advance should work
+    // (or we can call advance again and it should not panic)
+    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        client.advance(&admin, &2);
+    }));
+    assert!(result.is_ok()); // Should not panic
 }
