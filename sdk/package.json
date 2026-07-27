@@ -18,6 +18,7 @@
     "build": "tsup src/index.ts --format cjs,esm --dts --clean",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
     "test:integration": "vitest run tests/integration/*.integration.test.ts --reporter=verbose",
     "test:integration:watch": "vitest tests/integration/*.integration.test.ts --reporter=verbose",
     "lint": "eslint src/ tests/ --ext .ts",
