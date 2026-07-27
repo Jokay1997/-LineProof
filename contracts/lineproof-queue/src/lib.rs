@@ -97,7 +97,9 @@ impl QueueImpl {
         env.storage()
             .persistent()
             .extend_ttl(&env.current_contract_address(), TTL_THRESHOLD, TTL_EXTEND_TO);
-        env.storage().persistent().extend_ttl(&key_idx, TTL_THRESHOLD, TTL_EXTEND_TO);
+        env.storage()
+            .persistent()
+            .extend_ttl(&key_idx, TTL_THRESHOLD, TTL_EXTEND_TO);
         env.storage().instance().extend_ttl(TTL_THRESHOLD, TTL_EXTEND_TO);
         emit(&env, Symbol::new(&env, "Initialized"), 0, &admin, 0);
     }
@@ -300,7 +302,9 @@ impl QueueImpl {
         let key = Self::position_key(&env, position_id);
         let pos: Option<Position> = env.storage().persistent().get(&key);
         if let Some(ref _pos) = pos {
-            env.storage().persistent().extend_ttl(&key, TTL_THRESHOLD, TTL_EXTEND_TO);
+            env.storage()
+                .persistent()
+                .extend_ttl(&key, TTL_THRESHOLD, TTL_EXTEND_TO);
         }
         pos
     }
@@ -357,7 +361,9 @@ impl QueueImpl {
         pos.status = PositionStatus::Expired;
         let key_pos = Self::position_key(&env, position_id);
         env.storage().persistent().set(&key_pos, &pos);
-        env.storage().persistent().extend_ttl(&key_pos, TTL_THRESHOLD, TTL_EXTEND_TO);
+        env.storage()
+            .persistent()
+            .extend_ttl(&key_pos, TTL_THRESHOLD, TTL_EXTEND_TO);
         emit(
             &env,
             Symbol::new(&env, "Expired"),
@@ -381,7 +387,9 @@ impl QueueImpl {
             pos.status = PositionStatus::Expired;
             let key_pos = Self::position_key(&env, position_id);
             env.storage().persistent().set(&key_pos, &pos);
-            env.storage().persistent().extend_ttl(&key_pos, TTL_THRESHOLD, TTL_EXTEND_TO);
+            env.storage()
+                .persistent()
+                .extend_ttl(&key_pos, TTL_THRESHOLD, TTL_EXTEND_TO);
             emit(
                 &env,
                 Symbol::new(&env, "Expired"),

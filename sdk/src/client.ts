@@ -8,8 +8,9 @@ import {
   xdr,
   Address,
   Operation,
-} from "@stellar/stellar-sdk";
-import { createHash } from "crypto";
+} from '@stellar/stellar-sdk';
+import { createHash } from 'crypto';
+
 import {
   LineProofConfig,
   DEFAULT_LINEPROOF_CONFIG,
@@ -17,25 +18,19 @@ import {
   isNetworkPassphrase,
   resolveEndpoints,
   validateContractId,
-} from "./types.js";
+} from './types.js';
+import { paginate, decodeCursor, type Page } from './pagination.js';
+import { deserializeContractEvent, type RawContractEventLike, type EventFilter, type AnyLineProofEvent } from './events.js';
 import {
   withRetry,
   RetryConfig,
   DEFAULT_RETRY_CONFIG,
   OnRetryFn,
-} from "./utils.js";
-import { paginate, decodeCursor, type Page } from "./pagination.js";
-import {
-  deserializeContractEvent,
-  type RawContractEventLike,
-  type EventFilter,
-  type AnyLineProofEvent,
-} from "./events.js";
+} from './utils.js';
 
 // Neutral all-zeros account used as the source for simulation-only (read)
 // transactions, where no signature and no real sequence number are needed.
-const SIMULATION_ACCOUNT_ID =
-  "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF";
+const SIMULATION_ACCOUNT_ID = 'GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF';
 
 export class LineProofClient {
   readonly server: Horizon.Server;
@@ -173,8 +168,8 @@ export class LineProofClient {
   }
 
   async deployFactory(wasmBytes?: Uint8Array): Promise<string> {
-    this.requireKeypair();
-    await this.server.loadAccount(this.requireKeypair().publicKey());
+    const keypair = this.requireKeypair();
+    await this.server.loadAccount(keypair.publicKey());
 
     const bytesToDeploy =
       wasmBytes ??
@@ -269,11 +264,7 @@ export class LineProofClient {
     args: xdr.ScVal[] = [],
   ): Promise<xdr.ScVal> {
     validateContractId(contractId);
-    const source = new Account(
-      "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF",
-      "0",
-    );
-    const tx = new TransactionBuilder(source, {
+    const tx = new TransactionBuilder(this.simulationSource(), {
       fee: BASE_FEE,
       networkPassphrase: this.networkPassphrase,
     })
@@ -418,6 +409,6 @@ export class LineProofClient {
   static readOnly(
     config: Omit<LineProofConfig, "privateKey">,
   ): LineProofClient {
-    return new LineProofClient(config as LineProofConfig);
+    return new LineProofClient({ ...config });
   }
 }
