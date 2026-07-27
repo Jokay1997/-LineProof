@@ -167,7 +167,7 @@ describe('IdentityClient', () => {
   it('throws TRANSFER_DISABLED on transfer attempt', async () => {
     const client = new LineProofClient({ rpcServerUrl: 'http://localhost:8000', networkPassphrase: TEST_NET });
     const identity = new IdentityClient(client);
-    await expect(identity.recordTransferAttempt('from', 'to', VALID_CONTRACT_ID)).rejects.toThrow('TRANSFER_DISABLED');
+    await expect(identity.recordTransferAttempt('from', 'to')).rejects.toThrow('TRANSFER_DISABLED');
   });
 
   it('isBound parses boolean from simulateTransaction', async () => {

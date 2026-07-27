@@ -70,7 +70,6 @@ export class IdentityClient {
   async recordTransferAttempt(
     from: string,
     to: string,
-    queueId: string,
   ): Promise<void> {
     throw new SDKError(
       "TRANSFER_DISABLED",

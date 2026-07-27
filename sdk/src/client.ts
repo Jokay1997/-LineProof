@@ -8,7 +8,6 @@ import {
   xdr,
   Address,
   Operation,
-  StrKey,
 } from '@stellar/stellar-sdk';
 import { createHash } from 'crypto';
 
