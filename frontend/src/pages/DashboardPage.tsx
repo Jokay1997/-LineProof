@@ -91,13 +91,9 @@ export default function DashboardPage() {
           </button>
         </div>
         {error && (
-          <LiveRegion className="mt-2 text-sm text-red-600 dark:text-red-400">
           <div className="mt-4">
             <AlertBanner variant="error" message={error} />
           </div>
-          <LiveRegion className="mt-2 text-sm text-red-600">
-            {error}
-          </LiveRegion>
         )}
       </div>
 
