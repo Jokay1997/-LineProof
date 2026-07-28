@@ -1,21 +1,3 @@
-import 'dotenv/config';
-import express, { type Express } from 'express';
-import cors from 'cors';
-import helmet from 'helmet';
-import morgan from 'morgan';
-import queueRoutes from './routes/queues.js';
-import enrollmentRoutes from './routes/enrollments.js';
-import escrowRoutes from './routes/escrow.js';
-import publicRoutes from './routes/public.js';
-import { errorHandler } from './middleware/errorHandler.js';
-import { defaultRateLimiter, writeRateLimiter } from './middleware/rateLimiter.js';
-import { requestId } from './middleware/requestId.js';
-import { requestLogger } from './middleware/requestLogger.js';
-import { corsOriginsFromEnvironment, createCorsOptions } from './middleware/corsConfig.js';
-import { register, METRICS_CONTENT_TYPE } from './metrics/registry.js';
-import { healthPayload } from './health.js';
-
-export function createApp(allowedOrigins: string[] = corsOriginsFromEnvironment()): Express {
 import "dotenv/config";
 import express, { type Express } from "express";
 import cors from "cors";
@@ -38,6 +20,7 @@ import { register, METRICS_CONTENT_TYPE } from "./metrics/registry.js";
 import { healthPayload } from "./health.js";
 import { startWebhookDispatcher } from "./services/webhookDispatcher.js";
 import { checkContentLength } from "./middleware/contentLength.js";
+import { createCorsOptions } from "./middleware/corsConfig.js";
 
 export function createApp(): Express {
   startWebhookDispatcher();

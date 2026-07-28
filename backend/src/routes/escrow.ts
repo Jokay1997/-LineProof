@@ -40,7 +40,12 @@ router.post('/deposit', validateStellarAddress(['identity']), (req: Request<{}, 
     const parsed = DepositSchema.safeParse(req.body);
     if (!parsed.success) throw new ValidationError('Invalid request', { issues: parsed.error.issues });
 
-    const amount = toStroops(parsed.data.amount);
+    let amount: bigint;
+    try {
+      amount = toStroops(parsed.data.amount);
+    } catch (e) {
+      throw new ValidationError('Invalid amount format or value');
+    }
     if (amount === 0n || amount > MAX_I128_STROOPS) throw new ValidationError('Amount is outside the positive i128 range');
     const record = depositEscrow({ ...parsed.data, amount });
     recordEscrowDeposit(record.asset);

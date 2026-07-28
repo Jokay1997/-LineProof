@@ -1,6 +1,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import request from 'supertest';
-import { app } from '../../app.js';
+import { createApp } from '../../app.js';
+
+const app = createApp();
 import { config } from '../../config.js';
 import { serviceEmitter } from '../../services/eventEmitter.js';
 import { defaultMemoryAdapter } from '../../storage/index.js';
