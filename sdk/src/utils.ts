@@ -277,6 +277,40 @@ export async function withRetry<T>(
 // ═══════════════════════════════════════════════════════════════════════════════
 
 /** Validates that a string is a valid Stellar Ed25519 public key (checksum verified). */
+/** Maximum slug length. Matches a `soroban_sdk::String` queue id, well above
+ * Soroban's 9-character `Symbol` limit that a raw slug would otherwise hit. */
+export const MAX_SLUG_LENGTH = 64;
+
+/** Allowed slug shape: lowercase alphanumeric words joined by single hyphens. */
+const SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+
+/**
+ * Validates a queue slug before it is submitted to a contract (issue #86).
+ *
+ * A slug longer than Soroban's 9-character `Symbol` limit panics on-chain with
+ * no actionable cause. This guards the boundary so an over-length or malformed
+ * slug is rejected in the client with a clear `SDKError('INVALID_SLUG', ...)`
+ * long before it reaches the contract.
+ */
+export function validateSlug(slug: string): void {
+  if (typeof slug !== 'string' || slug.length === 0) {
+    throw new SDKError('INVALID_SLUG', 'Slug must be a non-empty string', { value: slug });
+  }
+  if (slug.length > MAX_SLUG_LENGTH) {
+    throw new SDKError('INVALID_SLUG', `Slug must be at most ${MAX_SLUG_LENGTH} characters`, {
+      value: slug,
+      length: slug.length,
+    });
+  }
+  if (!SLUG_PATTERN.test(slug)) {
+    throw new SDKError(
+      'INVALID_SLUG',
+      'Slug must be lowercase alphanumeric words separated by single hyphens (e.g. "sneaker-drop-001")',
+      { value: slug },
+    );
+  }
+}
+
 export function assertValidAddress(address: string, fieldName = 'address'): void {
   if (typeof address !== 'string' || !StrKey.isValidEd25519PublicKey(address)) {
     throw new SDKError(

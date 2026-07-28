@@ -560,9 +560,13 @@ impl QueueImpl {
     }
 }
 
-fn emit(env: &Env, kind: Symbol, position_id: u32, _identity: &Address, _timestamp: u64) {
-    env.events()
-        .publish((Symbol::new(env, "lineproof_queue"), kind, position_id), ());
+fn emit(env: &Env, kind: Symbol, position_id: u32, identity: &Address, timestamp: u64) {
+    // #83: carry the identity and timestamp in the event payload so auditors can
+    // rebuild queue history from events alone, instead of an empty `()` body.
+    env.events().publish(
+        (Symbol::new(env, "lineproof_queue"), kind, position_id),
+        (identity.clone(), timestamp),
+    );
 }
 
 #[cfg(test)]

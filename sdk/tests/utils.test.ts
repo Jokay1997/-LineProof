@@ -13,6 +13,8 @@ import {
   daysFromNow,
   truncateAddress,
   generateTestKeypair,
+  validateSlug,
+  MAX_SLUG_LENGTH,
 } from '../src/utils';
 import { SDKError } from '../src/types';
 import { Keypair } from '@stellar/stellar-sdk';
@@ -350,6 +352,39 @@ describe('toStroops / fromStroops', () => {
 
   it('round-trips a fractional amount, dropping trailing zeros', () => {
     expect(fromStroops(toStroops('123.4567890'))).toBe('123.456789');
+  });
+});
+
+describe('validateSlug (#86)', () => {
+  it('accepts a typical hyphenated slug', () => {
+    expect(() => validateSlug('sneaker-drop-001')).not.toThrow();
+    expect(() => validateSlug('visa-appointment-001')).not.toThrow();
+    expect(() => validateSlug('q')).not.toThrow();
+  });
+
+  it('accepts a slug at the maximum length', () => {
+    expect(() => validateSlug('a'.repeat(MAX_SLUG_LENGTH))).not.toThrow();
+  });
+
+  it('rejects a slug over the maximum length', () => {
+    expect(() => validateSlug('a'.repeat(MAX_SLUG_LENGTH + 1))).toThrow(SDKError);
+  });
+
+  it('rejects an empty slug', () => {
+    expect(() => validateSlug('')).toThrow(SDKError);
+  });
+
+  it('rejects uppercase, spaces, and invalid characters', () => {
+    expect(() => validateSlug('Sneaker-Drop')).toThrow(SDKError);
+    expect(() => validateSlug('sneaker drop')).toThrow(SDKError);
+    expect(() => validateSlug('sneaker_drop')).toThrow(SDKError);
+    expect(() => validateSlug('sneaker.drop')).toThrow(SDKError);
+  });
+
+  it('rejects leading, trailing, or doubled hyphens', () => {
+    expect(() => validateSlug('-sneaker')).toThrow(SDKError);
+    expect(() => validateSlug('sneaker-')).toThrow(SDKError);
+    expect(() => validateSlug('sneaker--drop')).toThrow(SDKError);
   });
 });
 
