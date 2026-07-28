@@ -1,3 +1,21 @@
+import 'dotenv/config';
+import express, { type Express } from 'express';
+import cors from 'cors';
+import helmet from 'helmet';
+import morgan from 'morgan';
+import queueRoutes from './routes/queues.js';
+import enrollmentRoutes from './routes/enrollments.js';
+import escrowRoutes from './routes/escrow.js';
+import publicRoutes from './routes/public.js';
+import { errorHandler } from './middleware/errorHandler.js';
+import { defaultRateLimiter, writeRateLimiter } from './middleware/rateLimiter.js';
+import { requestId } from './middleware/requestId.js';
+import { requestLogger } from './middleware/requestLogger.js';
+import { corsOriginsFromEnvironment, createCorsOptions } from './middleware/corsConfig.js';
+import { register, METRICS_CONTENT_TYPE } from './metrics/registry.js';
+import { healthPayload } from './health.js';
+
+export function createApp(allowedOrigins: string[] = corsOriginsFromEnvironment()): Express {
 import "dotenv/config";
 import express, { type Express } from "express";
 import cors from "cors";
@@ -30,7 +48,7 @@ export function createApp(): Express {
     .map((o) => o.trim());
 
   app.use(helmet());
-  app.use(cors({ origin: allowedOrigins }));
+  app.use(cors(createCorsOptions(allowedOrigins)));
   app.use(requestId);
 
   // GET /metrics is mounted before logging and rate limiting so scrapes are never
@@ -73,5 +91,3 @@ export function createApp(): Express {
 
   return app;
 }
-
-export const app = createApp();

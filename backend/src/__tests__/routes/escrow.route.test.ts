@@ -1,7 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import request from 'supertest';
-import { app } from '../../app.js';
+import { createApp } from '../../app.js';
 import * as escrowService from '../../services/escrowService.js';
+
+const app = createApp();
 
 vi.mock('../../services/escrowService.js');
 
@@ -15,6 +17,8 @@ describe('Escrow Routes', () => {
 
   describe('POST /api/escrow/deposit', () => {
     it('returns 400 on invalid body (missing amount)', async () => {
+      const res = await request(app).post('/api/escrow/deposit').send({ queueId: 'q1', identity: 'GB123', asset: 'USDC' });
+
       const res = await request(app)
         .post('/api/escrow/deposit')
         .send({ queueId: 'q1', identity: VALID_IDENTITY, asset: 'USDC' });
@@ -22,6 +26,21 @@ describe('Escrow Routes', () => {
       expect(res.status).toBe(400);
       expect(res.body.error.issues).toBeDefined();
     });
+
+    it('returns 201 on valid body', async () => {
+      const record = {
+        id: 'q1:GB123',
+        queueId: 'q1',
+        identity: 'GB123',
+        amount: 10,
+        asset: 'USDC',
+        status: 'Active',
+        createdAt: '',
+        expiresAt: '',
+      };
+      vi.mocked(escrowService.depositEscrow).mockReturnValue(record as any);
+
+      const res = await request(app).post('/api/escrow/deposit').send({ queueId: 'q1', identity: 'GB123', amount: 10, asset: 'USDC' });
 
     it('converts decimal XLM and serializes large stroop amounts exactly', async () => {
       const amount = 9_007_199_254_740_992n;
