@@ -7,9 +7,19 @@ import { NotFoundError, ValidationError } from '../errors/index.js';
 
 const router: IRouter = Router();
 
+// Issue #86: a slug longer than Soroban's 9-char `Symbol` limit panics on-chain
+// with no actionable cause. Constrain it at the API boundary to the same shape
+// the SDK's `validateSlug` enforces — lowercase alphanumeric words joined by
+// single hyphens, at most 64 characters (a `soroban_sdk::String` queue id) —
+// so an invalid slug is rejected with a 400 long before a transaction is built.
+const SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const CreateQueueSchema = z.object({
   name: z.string().min(1).max(120),
-  slug: z.string().min(1).max(120),
+  slug: z
+    .string()
+    .min(1)
+    .max(64)
+    .regex(SLUG_PATTERN, 'Slug must be lowercase alphanumeric words separated by single hyphens'),
   maxPositions: z.number().int().positive(),
   advancementRule: z.enum(['FIFO', 'Priority', 'VerifiableRandomness']).optional(),
   escrowRequired: z.boolean().optional(),

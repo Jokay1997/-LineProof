@@ -410,11 +410,12 @@ impl QueueFactoryImpl {
     }
 }
 
-fn emit(env: &Env, kind: Symbol, slug: Symbol, _contract_id: BytesN<32>, version: u32, _timestamp: u64) {
-    env.events()
-        .publish((Symbol::new(env, "lineproof.factory"), kind, slug, version));
-    env.events()
-        .publish((Symbol::new(env, "lineproof_factory"), kind, slug, version), ());
+fn emit(env: &Env, kind: Symbol, slug: Symbol, contract_id: BytesN<32>, version: u32, _timestamp: u64) {
+    // #83: carry the deployed contract id and version in the event payload.
+    env.events().publish(
+        (Symbol::new(env, "lineproof_factory"), kind, slug),
+        (contract_id.clone(), version),
+    );
 }
 
 #[cfg(test)]

@@ -5,7 +5,7 @@ describe('Integration: Enrollment flow', () => {
   const rpcServerUrl = process.env.SOROBAN_RPC_URL || 'https://soroban-testnet.stellar.org';
   const testPrivateKey = process.env.TEST_PRIVATE_KEY || 'SAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA';
   const testPublicKey = process.env.TEST_PUBLIC_KEY || 'GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF';
-  const testQueueId = process.env.TEST_QUEUE_ID || 'CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAF4H';
+  const testQueueId = process.env.TEST_QUEUE_ID || 'CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABSC4';
 
   let client: LineProofClient | undefined;
   let enrollmentClient: EnrollmentClient | undefined;

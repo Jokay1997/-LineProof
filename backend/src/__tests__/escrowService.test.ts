@@ -1,17 +1,17 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
-import {
-  depositEscrow,
-  releaseEscrow,
-  refundEscrow,
-  expireEscrow,
-  getEscrow,
-} from '../services/escrowService.js';
+import { describe, it, expect, beforeEach } from 'vitest';
+import { createEscrowService, type EscrowService } from '../services/escrowService.js';
+import { MemoryAdapter } from '../storage/index.js';
 
-// The escrow store is module-level. We reset all mocks between tests
-// to prevent state from leaking. For full isolation, the store would
-// need to be injectable — this is tracked in issue #003.
+// Issue #91: each test gets a service over a fresh, injected store, so there is
+// no shared module-level state to leak and no `vi.resetModules()` needed. Run
+// order can never change a result.
+let depositEscrow: EscrowService['depositEscrow'];
+let releaseEscrow: EscrowService['releaseEscrow'];
+let refundEscrow: EscrowService['refundEscrow'];
+let getEscrow: EscrowService['getEscrow'];
+
 beforeEach(() => {
-  vi.resetModules();
+  ({ depositEscrow, releaseEscrow, refundEscrow, getEscrow } = createEscrowService(new MemoryAdapter()));
 });
 
 describe('depositEscrow', () => {
