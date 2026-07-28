@@ -58,6 +58,39 @@ Pull requests should run formatting, linting, contract tests, SDK tests, and sec
 - PRs that reduce coverage below thresholds will fail CI
 - Coverage reports are generated as LCOV and HTML artifacts for inspection
 
+## Dependency injection for service isolation (issue #91)
+
+Stateful backend services (`escrowService`, `enrollmentService`, `queueService`)
+expose a **factory** rather than operating on a module-level store:
+
+```ts
+export function createEscrowService(store: StorageAdapter = defaultMemoryAdapter): EscrowService { … }
+
+/** Default singleton over the shared adapter — used by production route handlers. */
+export const escrowService = createEscrowService();
+```
+
+- **Production** imports the default singleton (or the backward-compatible
+  standalone re-exports bound to it), so route handlers are unchanged.
+- **Tests** construct a fresh instance over an injected store in `beforeEach`:
+
+  ```ts
+  let depositEscrow: EscrowService['depositEscrow'];
+  beforeEach(() => {
+    ({ depositEscrow, … } = createEscrowService(new MemoryAdapter()));
+  });
+  ```
+
+This replaces the previous `vi.resetModules()` and `import('…?t=' + Date.now())`
+workarounds, which did **not** clear already-imported module state and made
+tests order-dependent. Because each test owns its store, running the suite in a
+different order produces identical results, and edge-case tests never observe
+state set up by an earlier test.
+
+Prefer this pattern for any new stateful service: close over an injected
+dependency, export a factory plus a default singleton, and inject a fresh
+dependency per test.
+
 ## Release Criteria
 
 Before tagging a release:

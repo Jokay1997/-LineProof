@@ -296,6 +296,61 @@ describe('toStroops / fromStroops', () => {
   it('throws for negative amounts', () => {
     expect(() => toStroops(-1)).toThrow(SDKError);
   });
+
+  // ── #88: floating-point precision, input validation, string input ──
+
+  it('converts one stroop from a string without truncation', () => {
+    expect(toStroops('0.0000001')).toBe(1n);
+  });
+
+  it('converts one stroop from a number without floating-point truncation', () => {
+    // 0.0000001 * 10_000_000 is 0.09999999999999999 in float; the old
+    // implementation rounded that to 0n. The string path must return 1n.
+    expect(toStroops(0.0000001)).toBe(1n);
+  });
+
+  it('accepts both string and number inputs', () => {
+    expect(toStroops('123.456789')).toBe(toStroops(123.456789));
+    expect(toStroops('1')).toBe(10_000_000n);
+  });
+
+  it('throws SDKError for NaN', () => {
+    expect(() => toStroops(NaN)).toThrow(SDKError);
+    expect(() => toStroops(NaN)).toThrow(/finite/i);
+  });
+
+  it('throws SDKError for Infinity', () => {
+    expect(() => toStroops(Infinity)).toThrow(SDKError);
+    expect(() => toStroops(-Infinity)).toThrow(SDKError);
+  });
+
+  it('throws SDKError for a malformed string', () => {
+    expect(() => toStroops('abc')).toThrow(SDKError);
+    expect(() => toStroops('1.2.3')).toThrow(SDKError);
+  });
+
+  it('throws SDKError for negative string amounts', () => {
+    expect(() => toStroops('-5')).toThrow(SDKError);
+  });
+
+  it('throws SDKError for sub-stroop precision', () => {
+    expect(() => toStroops('0.00000001')).toThrow(SDKError);
+  });
+
+  it('throws SDKError for values that overflow i128', () => {
+    expect(() => toStroops('99999999999999999999999999999999')).toThrow(SDKError);
+  });
+
+  it('fromStroops handles whole numbers, fractions, one stroop, and large amounts', () => {
+    expect(fromStroops(10_000_000n)).toBe('1');
+    expect(fromStroops(1n)).toBe('0.0000001');
+    expect(fromStroops(5_000_000n)).toBe('0.5');
+    expect(fromStroops(123_456_789_000_0000n)).toBe('123456789');
+  });
+
+  it('round-trips a fractional amount, dropping trailing zeros', () => {
+    expect(fromStroops(toStroops('123.4567890'))).toBe('123.456789');
+  });
 });
 
 describe('nowSeconds', () => {
