@@ -294,6 +294,8 @@ impl QueueFactory for QueueFactoryImpl {
         env.storage()
             .persistent()
             .extend_ttl(&registry_key, TTL_THRESHOLD, TTL_EXTEND_TO);
+        // Upgrade the WASM code. The queue contract should call migrate() afterward
+        // if storage transformations are needed for the new version.
         env.deployer()
             .with_current_contract(&new_wasm_hash)
             .upgrade(&contract_id);
@@ -311,10 +313,11 @@ impl QueueFactory for QueueFactoryImpl {
 impl QueueFactoryImpl {
     fn require_admin(env: &Env, admin: &Address) {
         admin.require_auth();
+        let config_key = Symbol::new(env, "config");
         let config: FactoryConfig = env
             .storage()
             .persistent()
-            .get(&Symbol::new(env, "config"))
+            .get(&config_key)
             .unwrap_or_else(|| panic!("not initialized"));
         if config.admin != *admin {
             panic!("not authorized");

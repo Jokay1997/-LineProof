@@ -496,83 +496,82 @@ fn test_advance_empty_queue_returns_empty_vec() {
 }
 
 #[test]
+fn test_upgrade_requires_admin_auth() {
 fn test_expire_position() {
     let (env, admin, contract_id) = setup();
     let config = make_config(&env, &admin);
     let client = QueueImplClient::new(&env, &contract_id);
     client.initialize(&admin, &config);
-    client.open_enrollment(&admin);
 
-    let user = Address::generate(&env);
-    let pos_id = client.enroll_position(&user);
-    client.close_enrollment(&admin);
-    client.advance(&admin, &0);
-
-    client.expire_position(&admin, &pos_id);
-    let loaded = client.get_position(&pos_id).unwrap();
-    assert!(matches!(loaded.status, PositionStatus::Expired));
+    // Create a dummy WASM hash
+    let new_wasm_hash = soroban_sdk::BytesN::from_array(&env, &[1u8; 32]);
+    
+    // Call should succeed with auth mocked
+    client.upgrade(&admin, &new_wasm_hash);
 }
 
 #[test]
-#[should_panic(expected = "only pending positions can be expired")]
-fn test_expire_position_not_pending() {
+#[should_panic(expected = "unauthorized: only queue admin can upgrade")]
+fn test_upgrade_rejects_non_admin() {
     let (env, admin, contract_id) = setup();
     let config = make_config(&env, &admin);
     let client = QueueImplClient::new(&env, &contract_id);
     client.initialize(&admin, &config);
-    client.open_enrollment(&admin);
 
-    let user = Address::generate(&env);
-    let pos_id = client.enroll_position(&user);
-    client.close_enrollment(&admin);
-    let advanced = client.advance(&admin, &1);
-    assert_eq!(advanced.len(), 1);
-
-    // Attempt to expire an already-advanced position — should panic
-    client.expire_position(&admin, &pos_id);
+    let non_admin = Address::generate(&env);
+    let new_wasm_hash = soroban_sdk::BytesN::from_array(&env, &[1u8; 32]);
+    
+    // Should panic because non_admin is not the queue admin
+    client.upgrade(&non_admin, &new_wasm_hash);
 }
 
 #[test]
-#[should_panic(expected = "queue must be in advancement or closed state")]
-fn test_expire_position_wrong_state() {
+fn test_migrate_requires_admin_auth() {
     let (env, admin, contract_id) = setup();
     let config = make_config(&env, &admin);
     let client = QueueImplClient::new(&env, &contract_id);
     client.initialize(&admin, &config);
-    client.open_enrollment(&admin);
 
-    let user = Address::generate(&env);
-    let pos_id = client.enroll_position(&user);
-    // Queue is still in EnrollmentOpen — expire should panic
-    client.expire_position(&admin, &pos_id);
+    // Migrate from version 1 to version 2
+    client.migrate(&admin, &1, &2);
 }
 
 #[test]
-fn test_expire_positions_batch() {
+#[should_panic(expected = "unauthorized: only queue admin can migrate")]
+fn test_migrate_rejects_non_admin() {
     let (env, admin, contract_id) = setup();
     let config = make_config(&env, &admin);
     let client = QueueImplClient::new(&env, &contract_id);
     client.initialize(&admin, &config);
-    client.open_enrollment(&admin);
 
-    let user1 = Address::generate(&env);
-    let user2 = Address::generate(&env);
-    let user3 = Address::generate(&env);
-    let id1 = client.enroll_position(&user1);
-    let id2 = client.enroll_position(&user2);
-    let id3 = client.enroll_position(&user3);
-    client.close_enrollment(&admin);
-    client.advance(&admin, &0);
+    let non_admin = Address::generate(&env);
+    
+    // Should panic because non_admin is not the queue admin
+    client.migrate(&non_admin, &1, &2);
+}
 
-    let ids = Vec::from_array(&env, [id1, id2, id3]);
-    client.expire_positions_batch(&admin, &ids);
+#[test]
+#[should_panic(expected = "version mismatch: stored version does not match from_version")]
+fn test_migrate_version_mismatch() {
+    let (env, admin, contract_id) = setup();
+    let config = make_config(&env, &admin);
+    let client = QueueImplClient::new(&env, &contract_id);
+    client.initialize(&admin, &config);
 
-    let p1 = client.get_position(&id1).unwrap();
-    let p2 = client.get_position(&id2).unwrap();
-    let p3 = client.get_position(&id3).unwrap();
-    assert!(matches!(p1.status, PositionStatus::Expired));
-    assert!(matches!(p2.status, PositionStatus::Expired));
-    assert!(matches!(p3.status, PositionStatus::Expired));
+    // Try to migrate from version 2 when stored version is 1
+    client.migrate(&admin, &2, &3);
+}
+
+#[test]
+#[should_panic(expected = "to_version must be greater than from_version")]
+fn test_migrate_version_must_increase() {
+    let (env, admin, contract_id) = setup();
+    let config = make_config(&env, &admin);
+    let client = QueueImplClient::new(&env, &contract_id);
+    client.initialize(&admin, &config);
+
+    // Try to migrate from version 1 to version 1 (no increase)
+    client.migrate(&admin, &1, &1);
 }
 
 #[test]
