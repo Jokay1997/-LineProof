@@ -12,7 +12,6 @@ import {
   nowSeconds,
   daysFromNow,
   truncateAddress,
-  generateTestKeypair,
   validateSlug,
   MAX_SLUG_LENGTH,
 } from '../src/utils';
@@ -416,20 +415,3 @@ describe('truncateAddress', () => {
   });
 });
 
-describe('generateTestKeypair', () => {
-  it('returns a publicKey starting with G', () => {
-    const kp = generateTestKeypair();
-    expect(kp.publicKey).toMatch(/^G/);
-  });
-
-  it('returns a secretKey starting with S', () => {
-    const kp = generateTestKeypair();
-    expect(kp.secretKey).toMatch(/^S/);
-  });
-
-  it('returns different keypairs on each call', () => {
-    const kp1 = generateTestKeypair();
-    const kp2 = generateTestKeypair();
-    expect(kp1.publicKey).not.toBe(kp2.publicKey);
-  });
-});

@@ -19,10 +19,11 @@ vi.mock('@stellar/stellar-sdk', async (importOriginal) => {
     SorobanRpc: {
       ...actual.SorobanRpc,
       Server: vi.fn(() => ({
-        getAccount: vi.fn(async () => ({ sequence: '1' })),
+        getAccount: vi.fn(async () => new actual.Account('GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF', '1')),
         prepareTransaction: vi.fn(async (tx) => { (tx as any).sign = vi.fn(); return tx; }),
         sendTransaction: vi.fn(async () => ({ status: 'SUCCESS', hash: 'mockhash' })),
         simulateTransaction: vi.fn(async () => ({
+          transactionData: '',
           result: { retval: actual.xdr.ScVal.scvBool(true) }
         })),
         getTransaction: vi.fn(async () => ({
@@ -103,6 +104,7 @@ describe('QueueClient', () => {
     const { xdr } = await import('@stellar/stellar-sdk');
     
     client.sorobanServer.simulateTransaction = vi.fn().mockResolvedValue({
+      transactionData: '',
       result: {
         retval: xdr.ScVal.scvMap([
           new xdr.ScMapEntry({ key: xdr.ScVal.scvSymbol('position_id'), val: xdr.ScVal.scvU32(5) }),
@@ -147,6 +149,7 @@ describe('EnrollmentClient', () => {
     const { xdr } = await import('@stellar/stellar-sdk');
     
     client.sorobanServer.simulateTransaction = vi.fn().mockResolvedValue({
+      transactionData: '',
       result: { retval: xdr.ScVal.scvBool(true) }
     } as any);
 
@@ -176,6 +179,7 @@ describe('IdentityClient', () => {
     const { xdr } = await import('@stellar/stellar-sdk');
     
     client.sorobanServer.simulateTransaction = vi.fn().mockResolvedValue({
+      transactionData: '',
       result: { retval: xdr.ScVal.scvBool(false) }
     } as any);
 

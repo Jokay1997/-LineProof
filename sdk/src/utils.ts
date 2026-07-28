@@ -2,7 +2,7 @@
  * Utility helpers for the LineProof SDK.
  */
 
-import { Keypair, StrKey } from '@stellar/stellar-sdk';
+import { StrKey } from '@stellar/stellar-sdk';
 import { SDKError } from './types.js';
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -398,8 +398,3 @@ export function truncateAddress(address: string, chars = 6): string {
   return `${address.slice(0, chars)}…${address.slice(-chars)}`;
 }
 
-/** Generates a random Stellar keypair (for testing only — never for production keys). */
-export function generateTestKeypair(): { publicKey: string; secretKey: string } {
-  const kp = Keypair.random();
-  return { publicKey: kp.publicKey(), secretKey: kp.secret() };
-}
