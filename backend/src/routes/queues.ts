@@ -24,11 +24,11 @@ const CreateQueueSchema = z.object({
   advancementRule: z.enum(['FIFO', 'Priority', 'VerifiableRandomness']).optional(),
   escrowRequired: z.boolean().optional(),
   description: z.string().max(500).optional(),
-});
+}).strict();
 
 const AdvanceSchema = z.object({
   batchSize: z.number().int().positive().max(1000).optional(),
-});
+}).strict();
 
 const GetQueuesQuerySchema = z.object({
   status: z.string().optional(),
@@ -37,7 +37,7 @@ const GetQueuesQuerySchema = z.object({
     z.number().int().min(1).max(100).default(20)
   ),
   cursor: z.string().optional(),
-});
+}).strict();
 
 router.get('/', (req, res: Response): Response => {
   const queryResult = GetQueuesQuerySchema.safeParse(req.query);

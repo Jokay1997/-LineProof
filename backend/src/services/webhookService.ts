@@ -6,7 +6,7 @@ export const WebhookConfigSchema = z.object({
   url: z.string().url(),
   secret: z.string().min(8).max(128),
   events: z.array(z.string()).min(1),
-});
+}).strict();
 
 export type WebhookConfig = {
   id: string;

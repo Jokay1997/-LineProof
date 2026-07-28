@@ -16,7 +16,7 @@ const DepositSchema = z.object({
   amount: z.string().regex(/^\d+(?:\.\d{1,7})?$/),
   asset: z.string().min(1),
   holdDays: z.number().int().positive().optional(),
-});
+}).strict();
 
 const EscrowActionSchema = z.object({
   escrowId: z.string().min(1).refine(
@@ -30,7 +30,7 @@ const EscrowActionSchema = z.object({
       message: 'Invalid escrowId format. Must be ${queueId}:${identity} where identity is a valid Stellar address.',
     }
   ),
-});
+}).strict();
 
 type DepositInput = z.infer<typeof DepositSchema>;
 type EscrowActionInput = z.infer<typeof EscrowActionSchema>;

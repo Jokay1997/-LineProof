@@ -37,6 +37,7 @@ import { requestLogger } from "./middleware/requestLogger.js";
 import { register, METRICS_CONTENT_TYPE } from "./metrics/registry.js";
 import { healthPayload } from "./health.js";
 import { startWebhookDispatcher } from "./services/webhookDispatcher.js";
+import { checkContentLength } from "./middleware/contentLength.js";
 
 export function createApp(): Express {
   startWebhookDispatcher();
@@ -62,7 +63,8 @@ export function createApp(): Express {
     }
   });
 
-  app.use(express.json({ limit: "1mb" }));
+  app.use(checkContentLength(16384));
+  app.use(express.json({ limit: "16kb" }));
   // Morgan is a dev-only pretty-printer. requestLogger (below) is the sole
   // source of structured JSON logs in every other environment — mounting
   // both doubled log volume with two incompatible field sets (issue #30).
