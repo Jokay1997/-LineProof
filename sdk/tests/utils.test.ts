@@ -284,6 +284,10 @@ describe('toStroops / fromStroops', () => {
     expect(toStroops(0.5)).toBe(5_000_000n);
   });
 
+  it('converts large decimal strings without precision loss', () => {
+    expect(toStroops('900719925.4740992')).toBe(9_007_199_254_740_992n);
+  });
+
   it('converts back from stroops to readable', () => {
     expect(fromStroops(10_000_000n)).toBe('1');
     expect(fromStroops(5_000_000n)).toBe('0.5');

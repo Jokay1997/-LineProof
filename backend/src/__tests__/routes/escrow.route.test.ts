@@ -23,17 +23,27 @@ describe('Escrow Routes', () => {
       expect(res.body.error.issues).toBeDefined();
     });
 
-    it('returns 201 on valid body', async () => {
-      const record = { id: VALID_ESCROW_ID, queueId: 'q1', identity: VALID_IDENTITY, amount: 10, asset: 'USDC', status: 'Active', createdAt: '', expiresAt: '' };
+    it('converts decimal XLM and serializes large stroop amounts exactly', async () => {
+      const amount = 9_007_199_254_740_992n;
+      const record = { id: VALID_ESCROW_ID, queueId: 'q1', identity: VALID_IDENTITY, amount, asset: 'USDC', status: 'Active', createdAt: '', expiresAt: '' };
       vi.mocked(escrowService.depositEscrow).mockReturnValue(record as any);
 
       const res = await request(app)
         .post('/api/escrow/deposit')
-        .send({ queueId: 'q1', identity: VALID_IDENTITY, amount: 10, asset: 'USDC' });
+        .send({ queueId: 'q1', identity: VALID_IDENTITY, amount: '900719925.4740992', asset: 'USDC' });
       
       expect(res.status).toBe(201);
-      expect(res.body).toEqual(record);
-      expect(escrowService.depositEscrow).toHaveBeenCalledWith(expect.objectContaining({ queueId: 'q1', amount: 10 }));
+      expect(res.body.amount).toBe(amount.toString());
+      expect(escrowService.depositEscrow).toHaveBeenCalledWith(expect.objectContaining({ queueId: 'q1', amount }));
+    });
+
+    it('rejects amounts above the Soroban i128 maximum', async () => {
+      const res = await request(app)
+        .post('/api/escrow/deposit')
+        .send({ queueId: 'q1', identity: VALID_IDENTITY, amount: '17014118346046923173168730371588.4105728', asset: 'XLM' });
+
+      expect(res.status).toBe(400);
+      expect(escrowService.depositEscrow).not.toHaveBeenCalled();
     });
   });
 
@@ -90,11 +100,12 @@ describe('Escrow Routes', () => {
     });
 
     it('returns 200 with record', async () => {
-      const record = { id: `foo:${VALID_IDENTITY}` };
+      const amount = 9_007_199_254_740_992n;
+      const record = { id: `foo:${VALID_IDENTITY}`, amount };
       vi.mocked(escrowService.getEscrow).mockReturnValue(record as any);
       const res = await request(app).get(`/api/escrow/foo:${VALID_IDENTITY}`);
       expect(res.status).toBe(200);
-      expect(res.body).toEqual(record);
+      expect(res.body).toEqual({ ...record, amount: amount.toString() });
     });
   });
 });

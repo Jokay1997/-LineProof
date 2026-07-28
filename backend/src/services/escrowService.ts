@@ -7,7 +7,7 @@ export type EscrowRecord = {
   id: string;
   queueId: string;
   identity: string;
-  amount: number;
+  amount: bigint;
   asset: string;
   status: EscrowStatus;
   createdAt: string;
@@ -25,7 +25,7 @@ const HOLD_DAYS_DEFAULT = 30;
 export const depositEscrow = (payload: {
   queueId: string;
   identity: string;
-  amount: number;
+  amount: bigint;
   asset: string;
   holdDays?: number | undefined;
 }): EscrowRecord => {

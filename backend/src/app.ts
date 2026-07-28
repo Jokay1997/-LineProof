@@ -23,6 +23,7 @@ import { startWebhookDispatcher } from "./services/webhookDispatcher.js";
 export function createApp(): Express {
   startWebhookDispatcher();
   const app: Express = express();
+  app.set('json replacer', (_key: string, value: unknown) => typeof value === 'bigint' ? value.toString() : value);
 
   const allowedOrigins = (process.env.CORS_ORIGINS ?? "http://localhost:5173")
     .split(",")

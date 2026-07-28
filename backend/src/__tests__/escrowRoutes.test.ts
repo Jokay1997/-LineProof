@@ -27,6 +27,7 @@ describe('Escrow Routes - Stellar Address Validation', () => {
 
   beforeEach(() => {
     app = express();
+    app.set('json replacer', (_key, value) => typeof value === 'bigint' ? value.toString() : value);
     app.use(express.json());
     app.use('/api/escrow', escrowRouter);
     app.use(errorHandler);
@@ -75,7 +76,7 @@ describe('Escrow Routes - Stellar Address Validation', () => {
         id: `test-queue:${VALID_KEY}`,
         queueId: 'test-queue',
         identity: VALID_KEY,
-        amount: 100,
+        amount: 100n,
         asset: 'XLM',
         status: 'Active',
         createdAt: new Date().toISOString(),
@@ -89,7 +90,7 @@ describe('Escrow Routes - Stellar Address Validation', () => {
           queueId: 'test-queue',
           identity: 'GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA',
           identity: VALID_KEY,
-          amount: 100,
+          amount: '0.00001',
           asset: 'XLM',
         });
 
