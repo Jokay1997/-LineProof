@@ -99,6 +99,12 @@ impl QueueImpl {
         env.storage()
             .persistent()
             .extend_ttl(&key_idx, TTL_THRESHOLD, TTL_EXTEND_TO);
+        env.storage()
+            .persistent()
+            .extend_ttl(&env.current_contract_address(), TTL_THRESHOLD, TTL_EXTEND_TO);
+        env.storage()
+            .persistent()
+            .extend_ttl(&key_idx, TTL_THRESHOLD, TTL_EXTEND_TO);
         env.storage().instance().extend_ttl(TTL_THRESHOLD, TTL_EXTEND_TO);
         emit(&env, Symbol::new(&env, "Initialized"), 0, &admin, 0);
     }
@@ -258,19 +264,15 @@ impl QueueImpl {
         if matches!(config.status, QueueStatus::Closed) {
             panic!("queue is closed");
         }
-        if !matches!(config.status, QueueStatus::EnrollmentClosed) {
+        // Allow advance from both EnrollmentClosed (first call) and AdvancementActive (subsequent calls)
+        if !matches!(config.status, QueueStatus::EnrollmentClosed | QueueStatus::AdvancementActive) {
             panic!("enrollment must be closed before advancing");
         }
-        config.status = QueueStatus::AdvancementActive;
-        let key_config = Symbol::new(&env, "config");
-        env.storage().persistent().set(&key_config, &config);
-        env.storage()
-            .persistent()
-            .extend_ttl(&key_config, TTL_THRESHOLD, TTL_EXTEND_TO);
 
         match config.advancement_rule {
             AdvancementRule::Fifo => {
                 let mut advanced: Vec<u32> = Vec::new(&env);
+                let mut skipped: Vec<u32> = Vec::new(&env);
                 let mut idx: u32 = env.storage().persistent().get(&Symbol::new(&env, "idx")).unwrap_or(0);
 
                 for _ in 0..batch_size {
@@ -288,6 +290,16 @@ impl QueueImpl {
                                 .persistent()
                                 .extend_ttl(&key_pos, TTL_THRESHOLD, TTL_EXTEND_TO);
                             advanced.push_back(id);
+                        } else if matches!(pos.status, PositionStatus::Cancelled) {
+                            // Emit Skipped event for cancelled positions
+                            emit(
+                                &env,
+                                Symbol::new(&env, "Skipped"),
+                                id,
+                                &admin,
+                                env.ledger().timestamp(),
+                            );
+                            skipped.push_back(id);
                         }
                         idx += 1;
                     } else {
@@ -298,7 +310,18 @@ impl QueueImpl {
                 env.storage()
                     .persistent()
                     .extend_ttl(&Symbol::new(&env, "idx"), TTL_THRESHOLD, TTL_EXTEND_TO);
-                // Remain in AdvancementActive so callers can issue further advance() batches
+
+                // Only transition to AdvancementActive if at least one position was advanced
+                if !advanced.is_empty() && matches!(config.status, QueueStatus::EnrollmentClosed) {
+                    config.status = QueueStatus::AdvancementActive;
+                    let key_config = Symbol::new(&env, "config");
+                    env.storage().persistent().set(&key_config, &config);
+                    env.storage()
+                        .persistent()
+                        .extend_ttl(&key_config, TTL_THRESHOLD, TTL_EXTEND_TO);
+                }
+
+                // Emit Advanced events for successfully advanced positions
                 for id in advanced.iter() {
                     emit(
                         &env,

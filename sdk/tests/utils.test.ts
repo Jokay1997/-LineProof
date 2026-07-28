@@ -129,9 +129,9 @@ describe('withRetry', () => {
     (networkError as any).code = 'ECONNRESET';
     const fn = vi.fn().mockRejectedValue(networkError);
 
-    const promise = withRetry(fn, { maxRetries: 2, timeoutMs: 5000, baseDelayMs: 10, jitterFactor: 0 });
-    await vi.advanceTimersByTimeAsync(1000);
-    await expect(promise).rejects.toThrow('Connection reset');
+    await expect(
+      withRetry(fn, { maxRetries: 2, timeoutMs: 5000, baseDelayMs: 10, jitterFactor: 0 })
+    ).rejects.toThrow('Connection reset');
     expect(fn).toHaveBeenCalledTimes(3);
   });
 
@@ -245,14 +245,14 @@ describe('createTimeoutPromise', () => {
   it('rejects after specified timeout', async () => {
     const promise = createTimeoutPromise(1000);
     vi.advanceTimersByTime(1000);
-    await expect(promise).rejects.toThrow('timed out after 1000ms');
+    await expect(promise).rejects.toThrow('Transaction submission timed out after 1000ms');
   });
 
   it('rejects immediately when signal is aborted', async () => {
     const controller = new AbortController();
     const promise = createTimeoutPromise(10000, controller.signal);
     controller.abort();
-    await expect(promise).rejects.toThrow('aborted');
+    await expect(promise).rejects.toThrow('Transaction submission aborted');
   });
 });
 
@@ -282,6 +282,10 @@ describe('toStroops / fromStroops', () => {
 
   it('converts 0.5 to 5000000 stroops', () => {
     expect(toStroops(0.5)).toBe(5_000_000n);
+  });
+
+  it('converts large decimal strings without precision loss', () => {
+    expect(toStroops('900719925.4740992')).toBe(9_007_199_254_740_992n);
   });
 
   it('converts back from stroops to readable', () => {

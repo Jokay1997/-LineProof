@@ -157,7 +157,7 @@ function sleep(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-function createTimeoutPromise(timeoutMs: number, signal?: AbortSignal): Promise<never> {
+export function createTimeoutPromise(timeoutMs: number, signal?: AbortSignal): Promise<never> {
   return new Promise((_, reject) => {
     const timer = setTimeout(() => {
       const error = new Error(`Transaction submission timed out after ${timeoutMs}ms`);
@@ -288,9 +288,18 @@ export function assertValidAddress(address: string, fieldName = 'address'): void
 }
 
 /** Converts a readable asset amount to stroops (7 decimal places). */
-export function toStroops(amount: number): bigint {
-  if (amount < 0) throw new SDKError('INVALID_AMOUNT', 'Amount must be non-negative');
-  return BigInt(Math.round(amount * 10_000_000));
+export function toStroops(amount: number | string): bigint {
+  if (typeof amount === 'number') {
+    const stroops = amount * 10_000_000;
+    if (!Number.isSafeInteger(stroops) || stroops < 0) {
+      throw new SDKError('INVALID_AMOUNT', 'Amount must convert to a non-negative safe integer');
+    }
+    return BigInt(stroops);
+  }
+
+  const match = /^(\d+)(?:\.(\d{1,7}))?$/.exec(amount);
+  if (!match) throw new SDKError('INVALID_AMOUNT', 'Amount must be a non-negative decimal with at most 7 places');
+  return BigInt(match[1]) * 10_000_000n + BigInt((match[2] ?? '').padEnd(7, '0'));
 }
 
 /** Converts stroops back to a human-readable decimal string. */
