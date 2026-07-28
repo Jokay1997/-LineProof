@@ -175,15 +175,6 @@ impl QueueFactory for QueueFactoryImpl {
         );
     }
 
-    fn register_approved_hash(env: Env, admin: Address, version: u32, wasm_hash: BytesN<32>) {
-        Self::require_admin(&env, &admin);
-        let key = Self::approved_hash_key(&env, version);
-        env.storage().persistent().set(&key, &wasm_hash);
-        env.storage()
-            .persistent()
-            .extend_ttl(&key, TTL_THRESHOLD, TTL_EXTEND_TO);
-    }
-
     fn deactivate_queue(env: Env, admin: Address, slug: Symbol) {
         Self::require_admin(&env, &admin);
         let mut metadata = Self::get_queue_meta(&env, &slug);
@@ -422,6 +413,8 @@ impl QueueFactoryImpl {
 fn emit(env: &Env, kind: Symbol, slug: Symbol, _contract_id: BytesN<32>, version: u32, _timestamp: u64) {
     env.events()
         .publish((Symbol::new(env, "lineproof.factory"), kind, slug, version));
+    env.events()
+        .publish((Symbol::new(env, "lineproof_factory"), kind, slug, version), ());
 }
 
 #[cfg(test)]

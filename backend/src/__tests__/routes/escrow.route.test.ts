@@ -1,7 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import request from 'supertest';
-import { app } from '../../app.js';
+import { createApp } from '../../app.js';
 import * as escrowService from '../../services/escrowService.js';
+
+const app = createApp();
 
 vi.mock('../../services/escrowService.js');
 
@@ -15,6 +17,8 @@ describe('Escrow Routes', () => {
 
   describe('POST /api/escrow/deposit', () => {
     it('returns 400 on invalid body (missing amount)', async () => {
+      const res = await request(app).post('/api/escrow/deposit').send({ queueId: 'q1', identity: 'GB123', asset: 'USDC' });
+
       const res = await request(app)
         .post('/api/escrow/deposit')
         .send({ queueId: 'q1', identity: VALID_IDENTITY, asset: 'USDC' });
@@ -24,16 +28,41 @@ describe('Escrow Routes', () => {
     });
 
     it('returns 201 on valid body', async () => {
-      const record = { id: VALID_ESCROW_ID, queueId: 'q1', identity: VALID_IDENTITY, amount: 10, asset: 'USDC', status: 'Active', createdAt: '', expiresAt: '' };
+      const record = {
+        id: 'q1:GB123',
+        queueId: 'q1',
+        identity: 'GB123',
+        amount: 10,
+        asset: 'USDC',
+        status: 'Active',
+        createdAt: '',
+        expiresAt: '',
+      };
+      vi.mocked(escrowService.depositEscrow).mockReturnValue(record as any);
+
+      const res = await request(app).post('/api/escrow/deposit').send({ queueId: 'q1', identity: 'GB123', amount: 10, asset: 'USDC' });
+
+    it('converts decimal XLM and serializes large stroop amounts exactly', async () => {
+      const amount = 9_007_199_254_740_992n;
+      const record = { id: VALID_ESCROW_ID, queueId: 'q1', identity: VALID_IDENTITY, amount, asset: 'USDC', status: 'Active', createdAt: '', expiresAt: '' };
       vi.mocked(escrowService.depositEscrow).mockReturnValue(record as any);
 
       const res = await request(app)
         .post('/api/escrow/deposit')
-        .send({ queueId: 'q1', identity: VALID_IDENTITY, amount: 10, asset: 'USDC' });
+        .send({ queueId: 'q1', identity: VALID_IDENTITY, amount: '900719925.4740992', asset: 'USDC' });
       
       expect(res.status).toBe(201);
-      expect(res.body).toEqual(record);
-      expect(escrowService.depositEscrow).toHaveBeenCalledWith(expect.objectContaining({ queueId: 'q1', amount: 10 }));
+      expect(res.body.amount).toBe(amount.toString());
+      expect(escrowService.depositEscrow).toHaveBeenCalledWith(expect.objectContaining({ queueId: 'q1', amount }));
+    });
+
+    it('rejects amounts above the Soroban i128 maximum', async () => {
+      const res = await request(app)
+        .post('/api/escrow/deposit')
+        .send({ queueId: 'q1', identity: VALID_IDENTITY, amount: '17014118346046923173168730371588.4105728', asset: 'XLM' });
+
+      expect(res.status).toBe(400);
+      expect(escrowService.depositEscrow).not.toHaveBeenCalled();
     });
   });
 
@@ -90,11 +119,12 @@ describe('Escrow Routes', () => {
     });
 
     it('returns 200 with record', async () => {
-      const record = { id: `foo:${VALID_IDENTITY}` };
+      const amount = 9_007_199_254_740_992n;
+      const record = { id: `foo:${VALID_IDENTITY}`, amount };
       vi.mocked(escrowService.getEscrow).mockReturnValue(record as any);
       const res = await request(app).get(`/api/escrow/foo:${VALID_IDENTITY}`);
       expect(res.status).toBe(200);
-      expect(res.body).toEqual(record);
+      expect(res.body).toEqual({ ...record, amount: amount.toString() });
     });
   });
 });
