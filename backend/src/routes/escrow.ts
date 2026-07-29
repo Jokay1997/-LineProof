@@ -16,7 +16,7 @@ const DepositSchema = z.object({
   amount: z.string().regex(/^\d+(?:\.\d{1,7})?$/),
   asset: z.string().min(1),
   holdDays: z.number().int().positive().optional(),
-});
+}).strict();
 
 const EscrowActionSchema = z.object({
   escrowId: z.string().min(1).refine(
@@ -30,7 +30,7 @@ const EscrowActionSchema = z.object({
       message: 'Invalid escrowId format. Must be ${queueId}:${identity} where identity is a valid Stellar address.',
     }
   ),
-});
+}).strict();
 
 type DepositInput = z.infer<typeof DepositSchema>;
 type EscrowActionInput = z.infer<typeof EscrowActionSchema>;
@@ -40,7 +40,12 @@ router.post('/deposit', validateStellarAddress(['identity']), (req: Request<{}, 
     const parsed = DepositSchema.safeParse(req.body);
     if (!parsed.success) throw new ValidationError('Invalid request', { issues: parsed.error.issues });
 
-    const amount = toStroops(parsed.data.amount);
+    let amount: bigint;
+    try {
+      amount = toStroops(parsed.data.amount);
+    } catch (e) {
+      throw new ValidationError('Invalid amount format or value');
+    }
     if (amount === 0n || amount > MAX_I128_STROOPS) throw new ValidationError('Amount is outside the positive i128 range');
     const record = depositEscrow({ ...parsed.data, amount });
     recordEscrowDeposit(record.asset);

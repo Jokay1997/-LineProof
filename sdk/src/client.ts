@@ -30,7 +30,7 @@ import {
 
 // Neutral all-zeros account used as the source for simulation-only (read)
 // transactions, where no signature and no real sequence number are needed.
-const SIMULATION_ACCOUNT_ID = 'GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF';
+const SIMULATION_ACCOUNT_ID = 'GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF';
 
 export class LineProofClient {
   readonly server: Horizon.Server;

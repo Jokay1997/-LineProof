@@ -35,11 +35,13 @@ vi.mock('@stellar/stellar-sdk', async (importOriginal) => {
     },
     BASE_FEE: '100',
     SorobanRpc: {
+      ...actual.SorobanRpc,
       Server: vi.fn(() => ({
-        getAccount: vi.fn(async () => ({ sequenceNumber: () => '1' })),
+        getAccount: vi.fn(async () => new actual.Account('GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF', '1')),
         prepareTransaction: vi.fn(async (tx) => { (tx as any).sign = vi.fn(); return tx; }),
         sendTransaction: vi.fn(async () => ({ status: 'SUCCESS', hash: 'mockhash' })),
         simulateTransaction: vi.fn(async () => ({
+          transactionData: '',
           result: { retval: actual.xdr.ScVal.scvBool(true) }
         })),
         getTransaction: vi.fn(async () => ({

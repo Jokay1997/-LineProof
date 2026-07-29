@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import request from 'supertest';
 import { createApp } from '../../app.js';
 import * as enrollmentService from '../../services/enrollmentService.js';
+import { defaultMemoryAdapter } from '../../storage/index.js';
 
 const app = createApp();
 
@@ -12,6 +13,7 @@ const VALID_IDENTITY = 'GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF
 describe('Enrollments Routes', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    defaultMemoryAdapter.reset();
   });
 
   describe('POST /api/enrollments/enroll', () => {
@@ -22,11 +24,6 @@ describe('Enrollments Routes', () => {
     });
 
     it('returns 409 on conflict', async () => {
-      vi.mocked(enrollmentService.enroll).mockReturnValue({
-        success: false,
-        conflict: true,
-      } as any);
-      const res = await request(app).post('/api/enrollments').send({ queueId: 'q1', identity: 'GB123' });
       vi.mocked(enrollmentService.enrollIdentity).mockReturnValue({ queueId: 'q1', identity: VALID_IDENTITY, enrolledAt: '', conflict: true, cancelled: false });
       const res = await request(app).post('/api/enrollments/enroll').send({ queueId: 'q1', identity: VALID_IDENTITY });
       expect(res.status).toBe(409);
@@ -34,11 +31,6 @@ describe('Enrollments Routes', () => {
     });
 
     it('returns 201 on success', async () => {
-      vi.mocked(enrollmentService.enroll).mockReturnValue({
-        success: true,
-        record: { id: 'r1' },
-      } as any);
-      const res = await request(app).post('/api/enrollments').send({ queueId: 'q1', identity: 'GB123' });
       vi.mocked(enrollmentService.enrollIdentity).mockReturnValue({ queueId: 'q1', identity: VALID_IDENTITY, enrolledAt: '', conflict: false, cancelled: false });
       const res = await request(app).post('/api/enrollments/enroll').send({ queueId: 'q1', identity: VALID_IDENTITY });
       expect(res.status).toBe(201);

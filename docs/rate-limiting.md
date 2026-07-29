@@ -96,3 +96,11 @@ createRateLimiter({
 - Apply separate rate limits per operator identity, not just per IP, once
   auth is in place.
 - Consider token-bucket or leaky-bucket algorithms for smoother burst handling.
+
+## Payload Size Limits
+
+To prevent memory exhaustion and CPU spiking from large JSON payloads, a strict Content-Length check is enforced globally before body parsing:
+
+- The maximum allowed JSON payload size is **16kb**.
+- Requests exceeding this limit receive a `413 Payload Too Large` response.
+- Zod schemas enforce `.strict()` validation, rejecting unexpected fields to ensure the payload only contains necessary data.
