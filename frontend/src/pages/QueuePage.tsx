@@ -64,7 +64,6 @@ export default function QueuePage() {
 
   return (
     <div className="space-y-6">
-      <LiveRegion type="status" className="sr-only">Content loaded</LiveRegion>
       <Link to="/queues" className="inline-flex items-center gap-2 text-sm text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-50">
         <ArrowLeft className="h-4 w-4" /> Back to queues
       </Link>
