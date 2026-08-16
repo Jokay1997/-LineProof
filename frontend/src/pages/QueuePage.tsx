@@ -1,4 +1,4 @@
-import { useState, type FormEvent, type ReactNode } from 'react';
+import { useState, type FormEvent } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { ArrowLeft, ShieldCheck, Users, Clock } from 'lucide-react';
 import { useQueue } from '../hooks/useQueues';
@@ -10,18 +10,7 @@ import CopyButton from '../components/CopyButton';
 import AlertBanner from '../components/AlertBanner';
 import EscrowStatusCard from '../components/EscrowStatusCard';
 import LiveRegion from '../components/LiveRegion';
-
-function Stat({ label, value, icon }: { label: string; value: string; icon: ReactNode }) {
-  return (
-    <div className="rounded-xl border border-slate-200 bg-slate-50 dark:bg-slate-800/50 dark:border-slate-700 p-4">
-      <dt className="text-xs text-slate-500 dark:text-slate-400">
-        <span className="mb-2 block text-slate-500 dark:text-slate-400" aria-hidden="true">{icon}</span>
-        {label}
-      </dt>
-      <dd className="mt-0.5 text-sm font-semibold text-slate-900 dark:text-slate-50">{value}</dd>
-    </div>
-  );
-}
+import StatCard from '../components/StatCard';
 
 export default function QueuePage() {
   const { id = '' } = useParams();
@@ -78,11 +67,11 @@ export default function QueuePage() {
           <QueueStatusBadge status={queue.status} />
         </div>
 
-        <dl className="mt-6 grid gap-4 md:grid-cols-3">
-          <Stat label="Positions" value={`${queue.enrolled} / ${queue.maxPositions}`} icon={<Users className="h-5 w-5" />} />
-          <Stat label="Rule" value={queue.advancementRule} icon={<Clock className="h-5 w-5" />} />
-          <Stat label="Escrow" value={`${queue.escrowAmount} ${queue.escrowAsset}`} icon={<ShieldCheck className="h-5 w-5" />} />
-        </dl>
+        <div className="mt-6 grid gap-4 md:grid-cols-3">
+          <StatCard label="Positions" value={`${queue.enrolled} / ${queue.maxPositions}`} icon={<Users className="h-5 w-5" />} />
+          <StatCard label="Rule" value={queue.advancementRule} icon={<Clock className="h-5 w-5" />} />
+          <StatCard label="Escrow" value={`${queue.escrowAmount} ${queue.escrowAsset}`} icon={<ShieldCheck className="h-5 w-5" />} />
+        </div>
 
         <ProgressBar value={pct} label="Enrollment fill" className="mt-6" />
       </section>
