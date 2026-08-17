@@ -1,7 +1,12 @@
 import { Operation, xdr, scValToNative } from "@stellar/stellar-sdk";
 import { LineProofClient } from "./client.js";
 import { SDKError, Position, validateContractId } from "./types.js";
-import { OnRetryFn } from "./utils.js";
+import {
+  OnRetryFn,
+  encodeScAddress,
+  encodeScU32,
+  assertValidAddress,
+} from "./utils.js";
 
 export type QueueClientOptions = {
   queueContractId: string;
@@ -42,7 +47,7 @@ export class QueueClient {
         "Failed to parse Position from contract",
       );
     }
-    let status = 'pending';
+    let status = "pending";
     // Soroban enums/symbols can sometimes be parsed as strings or objects.
     if (parsed.status) {
       if (typeof parsed.status === "string") {
@@ -62,15 +67,21 @@ export class QueueClient {
 
   /**
    * Advance the queue. Retries transient failures automatically.
+   * @param admin  Admin address (required for authorization)
    * @param batchSize  Number of positions to advance
    * @param onRetry  Optional observer for retry attempts
    */
-  async advance(batchSize: number, onRetry?: OnRetryFn): Promise<number[]> {
+  async advance(
+    admin: string,
+    batchSize: number,
+    onRetry?: OnRetryFn,
+  ): Promise<number[]> {
+    assertValidAddress(admin, "admin");
     const hash = await this.lineProof.submitSorobanOperation(
       Operation.invokeContractFunction({
         contract: this.queueContractId,
         function: "advance",
-        args: [xdr.ScVal.scvU32(batchSize)],
+        args: [encodeScAddress(admin), encodeScU32(batchSize)],
       }),
       onRetry,
     );
@@ -79,12 +90,13 @@ export class QueueClient {
     return advancedIds || [];
   }
 
-  async close(onRetry?: OnRetryFn): Promise<string> {
+  async close(admin: string, onRetry?: OnRetryFn): Promise<string> {
+    assertValidAddress(admin, "admin");
     return this.lineProof.submitSorobanOperation(
       Operation.invokeContractFunction({
         contract: this.queueContractId,
         function: "close",
-        args: [],
+        args: [encodeScAddress(admin)],
       }),
       onRetry,
     );
