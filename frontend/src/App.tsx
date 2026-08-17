@@ -2,12 +2,19 @@ import { Routes, Route, Link, NavLink } from 'react-router-dom';
 import { lazy, Suspense } from 'react';
 import ErrorBoundary from './components/ErrorBoundary';
 import Spinner from './components/Spinner';
+import { useScrollToTop } from './hooks/useScrollToTop';
 
 const HomePage = lazy(() => import('./pages/HomePage'));
 const QueuePage = lazy(() => import('./pages/QueuePage'));
 const QueuesPage = lazy(() => import('./pages/QueuesPage'));
 const DashboardPage = lazy(() => import('./pages/DashboardPage'));
 const NotFoundPage = lazy(() => import('./pages/NotFoundPage'));
+
+/** Thin component wrapper so the hook can consume the router context. */
+function ScrollToTop() {
+  useScrollToTop();
+  return null;
+}
 
 export default function App() {
   const navClass = ({ isActive }: { isActive: boolean }) =>
@@ -28,6 +35,7 @@ export default function App() {
         </div>
       </nav>
       <main className="mx-auto max-w-6xl px-6 py-10">
+        <ScrollToTop />
         <ErrorBoundary>
           <Suspense fallback={<div className="flex justify-center items-center p-12"><Spinner size="lg" /></div>}>
             <Routes>

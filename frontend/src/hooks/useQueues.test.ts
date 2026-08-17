@@ -46,8 +46,8 @@ describe('useQueues hook', () => {
   });
 
   it('handles cleanup (cancelled flag)', async () => {
-    let resolvePromise: (value: any) => void;
-    const promise = new Promise((resolve) => {
+    let resolvePromise!: (value: unknown) => void;
+    const promise = new Promise<unknown>((resolve) => {
       resolvePromise = resolve;
     });
 

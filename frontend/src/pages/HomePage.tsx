@@ -62,7 +62,7 @@ export default function HomePage() {
                   className="rounded-2xl border border-slate-200 bg-white dark:bg-slate-800 dark:border-slate-700 p-5 shadow-sm transition hover:border-slate-300 dark:hover:border-slate-600 hover:shadow-md">
                   <div className="flex items-start justify-between gap-2">
                     <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-50">{q.name}</h3>
-                    <QueueStatusBadge status={q.status as any} />
+                    <QueueStatusBadge status={q.status} />
                   </div>
                   <ProgressBar value={pct} label={`${q.enrolled} / ${q.maxPositions}`} className="mt-3" />
                 </Link>

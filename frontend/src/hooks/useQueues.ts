@@ -23,14 +23,14 @@ interface CacheEntry {
 }
 
 const cache = new Map<string, CacheEntry>();
-const inFlightPromises = new Map<string, Promise<any>>();
+const inFlightPromises = new Map<string, Promise<unknown>>();
 
 export function clearQueuesCache() {
   cache.clear();
   inFlightPromises.clear();
 }
 
-function fetchWithDeduplication(url: string): Promise<any> {
+function fetchWithDeduplication(url: string): Promise<unknown> {
   let promise = inFlightPromises.get(url);
   if (!promise) {
     promise = fetch(url)
@@ -81,7 +81,7 @@ export function useQueues(options?: { status?: string; limit?: number }) {
       .then((json) => {
         const data = (json && typeof json === 'object' && 'items' in json)
           ? (json as { items: QueueSummary[]; nextCursor: string | null; total: number })
-          : { items: json as QueueSummary[], nextCursor: null, total: (json as any).length };
+          : { items: json as QueueSummary[], nextCursor: null, total: (json as QueueSummary[]).length };
 
         if (!cancelled) {
           setQueues(data.items);
@@ -117,7 +117,7 @@ export function useQueues(options?: { status?: string; limit?: number }) {
       const json = await fetchWithDeduplication(url);
       const data = (json && typeof json === 'object' && 'items' in json)
         ? (json as { items: QueueSummary[]; nextCursor: string | null; total: number })
-        : { items: json as QueueSummary[], nextCursor: null, total: (json as any).length };
+        : { items: json as QueueSummary[], nextCursor: null, total: (json as QueueSummary[]).length };
       
       setQueues((prev) => {
         const updated = [...prev, ...data.items];
@@ -132,8 +132,8 @@ export function useQueues(options?: { status?: string; limit?: number }) {
       });
       setNextCursor(data.nextCursor);
       setTotal(data.total);
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Unknown error');
     } finally {
       setLoadingNextPage(false);
     }
