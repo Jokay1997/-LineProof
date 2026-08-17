@@ -590,5 +590,7 @@ export function encodeScBytes(bytes: Buffer | Uint8Array): xdr.ScVal {
       { type: typeof bytes },
     );
   }
-  return xdr.ScVal.scvBytes(bytes);
+  // Convert to Buffer if needed for xdr.ScVal.scvBytes()
+  const buffer = bytes instanceof Buffer ? bytes : Buffer.from(bytes);
+  return xdr.ScVal.scvBytes(buffer);
 }
