@@ -2,8 +2,8 @@
  * Utility helpers for the LineProof SDK.
  */
 
-import { StrKey } from '@stellar/stellar-sdk';
-import { SDKError } from './types.js';
+import { StrKey, xdr, Address } from "@stellar/stellar-sdk";
+import { SDKError } from "./types.js";
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Retry & Timeout Infrastructure (Issue #37)
@@ -11,15 +11,15 @@ import { SDKError } from './types.js';
 
 export enum ErrorCategory {
   /** Transient network errors — safe to retry */
-  RETRYABLE_NETWORK = 'RETRYABLE_NETWORK',
+  RETRYABLE_NETWORK = "RETRYABLE_NETWORK",
   /** Sequence mismatch — requires account re-fetch before retry */
-  RETRYABLE_SEQUENCE = 'RETRYABLE_SEQUENCE',
+  RETRYABLE_SEQUENCE = "RETRYABLE_SEQUENCE",
   /** Insufficient fee / resources — may be retried with higher fee */
-  RETRYABLE_INSUFFICIENT = 'RETRYABLE_INSUFFICIENT',
+  RETRYABLE_INSUFFICIENT = "RETRYABLE_INSUFFICIENT",
   /** Invalid transaction (4xx, bad auth, malformed) — never retry */
-  TERMINAL_INVALID = 'TERMINAL_INVALID',
+  TERMINAL_INVALID = "TERMINAL_INVALID",
   /** Unknown — conservative: retry once, then fail */
-  UNKNOWN = 'UNKNOWN',
+  UNKNOWN = "UNKNOWN",
 }
 
 export interface RetryConfig {
@@ -39,28 +39,49 @@ export const DEFAULT_RETRY_CONFIG: RetryConfig = {
 };
 
 const SEQUENCE_ERROR_CODES = [
-  'tx_bad_seq', 'TX_BAD_SEQ', 'tx_bad_seq_no_entry',
+  "tx_bad_seq",
+  "TX_BAD_SEQ",
+  "tx_bad_seq_no_entry",
 ];
 
 const INSUFFICIENT_ERROR_CODES = [
-  'tx_insufficient_fee', 'tx_insufficient_balance',
-  'TX_INSUFFICIENT_FEE', 'INSUFFICIENT_BALANCE', 'INSUFFICIENT_FEE',
-  'tx_too_late', 'TX_TOO_LATE',
+  "tx_insufficient_fee",
+  "tx_insufficient_balance",
+  "TX_INSUFFICIENT_FEE",
+  "INSUFFICIENT_BALANCE",
+  "INSUFFICIENT_FEE",
+  "tx_too_late",
+  "TX_TOO_LATE",
 ];
 
 const INVALID_ERROR_CODES = [
-  'tx_bad_auth', 'tx_bad_auth_extra', 'TX_BAD_AUTH',
-  'tx_missing_operation', 'TX_MISSING_OPERATION',
-  'tx_bad_min_seq_age_or_gap', 'TX_BAD_MIN_SEQ_AGE_OR_GAP',
-  'tx_malformed', 'TX_MALFORMED',
-  'op_no_source_account', 'op_not_supported', 'op_bad_auth',
-  'op_src_no_trust', 'op_line_full', 'op_no_issuer',
-  'op_not_authorized', 'op_exceeded_work_limit',
+  "tx_bad_auth",
+  "tx_bad_auth_extra",
+  "TX_BAD_AUTH",
+  "tx_missing_operation",
+  "TX_MISSING_OPERATION",
+  "tx_bad_min_seq_age_or_gap",
+  "TX_BAD_MIN_SEQ_AGE_OR_GAP",
+  "tx_malformed",
+  "TX_MALFORMED",
+  "op_no_source_account",
+  "op_not_supported",
+  "op_bad_auth",
+  "op_src_no_trust",
+  "op_line_full",
+  "op_no_issuer",
+  "op_not_authorized",
+  "op_exceeded_work_limit",
 ];
 
 const NETWORK_ERROR_CODES = [
-  'ECONNRESET', 'ETIMEDOUT', 'ECONNREFUSED', 'ENOTFOUND',
-  'EPIPE', 'ENETUNREACH', 'EAI_AGAIN',
+  "ECONNRESET",
+  "ETIMEDOUT",
+  "ECONNREFUSED",
+  "ENOTFOUND",
+  "EPIPE",
+  "ENETUNREACH",
+  "EAI_AGAIN",
 ];
 
 const RETRYABLE_HTTP_STATUS = [408, 429, 500, 502, 503, 504];
@@ -73,7 +94,7 @@ export function classifyError(error: unknown): ErrorCategory {
   if (!(error instanceof Error)) return ErrorCategory.UNKNOWN;
 
   const msg = error.message.toLowerCase();
-  const code = (error as any).code || (error as any).status || '';
+  const code = (error as any).code || (error as any).status || "";
   const extras = (error as any).extras;
   const resultCodes = extras?.result_codes;
   const httpStatus = (error as any).status;
@@ -84,42 +105,59 @@ export function classifyError(error: unknown): ErrorCategory {
   if (resultCodes) {
     const txCode = resultCodes.transaction;
     if (txCode) {
-      if (SEQUENCE_ERROR_CODES.includes(txCode)) return ErrorCategory.RETRYABLE_SEQUENCE;
-      if (INVALID_ERROR_CODES.includes(txCode)) return ErrorCategory.TERMINAL_INVALID;
-      if (INSUFFICIENT_ERROR_CODES.includes(txCode)) return ErrorCategory.RETRYABLE_INSUFFICIENT;
+      if (SEQUENCE_ERROR_CODES.includes(txCode))
+        return ErrorCategory.RETRYABLE_SEQUENCE;
+      if (INVALID_ERROR_CODES.includes(txCode))
+        return ErrorCategory.TERMINAL_INVALID;
+      if (INSUFFICIENT_ERROR_CODES.includes(txCode))
+        return ErrorCategory.RETRYABLE_INSUFFICIENT;
     }
     const opCodes: string[] = resultCodes.operations || [];
     for (const opCode of opCodes) {
-      if (INVALID_ERROR_CODES.includes(opCode)) return ErrorCategory.TERMINAL_INVALID;
+      if (INVALID_ERROR_CODES.includes(opCode))
+        return ErrorCategory.TERMINAL_INVALID;
     }
   }
 
   // 2. HTTP status codes
   const status = httpStatus || responseStatus;
   if (status) {
-    if (TERMINAL_HTTP_STATUS.includes(Number(status))) return ErrorCategory.TERMINAL_INVALID;
-    if (RETRYABLE_HTTP_STATUS.includes(Number(status))) return ErrorCategory.RETRYABLE_NETWORK;
+    if (TERMINAL_HTTP_STATUS.includes(Number(status)))
+      return ErrorCategory.TERMINAL_INVALID;
+    if (RETRYABLE_HTTP_STATUS.includes(Number(status)))
+      return ErrorCategory.RETRYABLE_NETWORK;
   }
 
   // 3. Network-level error codes
-  if (typeof code === 'string' && NETWORK_ERROR_CODES.includes(code)) {
+  if (typeof code === "string" && NETWORK_ERROR_CODES.includes(code)) {
     return ErrorCategory.RETRYABLE_NETWORK;
   }
 
   // 4. Message pattern matching
-  if (msg.includes('bad sequence') || msg.includes('tx_bad_seq')) {
+  if (msg.includes("bad sequence") || msg.includes("tx_bad_seq")) {
     return ErrorCategory.RETRYABLE_SEQUENCE;
   }
-  if (msg.includes('timeout') || msg.includes('timed out')) {
+  if (msg.includes("timeout") || msg.includes("timed out")) {
     return ErrorCategory.RETRYABLE_NETWORK;
   }
-  if (msg.includes('network') || msg.includes('connection') || msg.includes('econn')) {
+  if (
+    msg.includes("network") ||
+    msg.includes("connection") ||
+    msg.includes("econn")
+  ) {
     return ErrorCategory.RETRYABLE_NETWORK;
   }
-  if (msg.includes('insufficient') && (msg.includes('fee') || msg.includes('balance'))) {
+  if (
+    msg.includes("insufficient") &&
+    (msg.includes("fee") || msg.includes("balance"))
+  ) {
     return ErrorCategory.RETRYABLE_INSUFFICIENT;
   }
-  if (msg.includes('invalid') || msg.includes('malformed') || msg.includes('bad auth')) {
+  if (
+    msg.includes("invalid") ||
+    msg.includes("malformed") ||
+    msg.includes("bad auth")
+  ) {
     return ErrorCategory.TERMINAL_INVALID;
   }
 
@@ -154,21 +192,26 @@ export function calculateBackoff(
 }
 
 function sleep(ms: number): Promise<void> {
-  return new Promise(resolve => setTimeout(resolve, ms));
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-export function createTimeoutPromise(timeoutMs: number, signal?: AbortSignal): Promise<never> {
+export function createTimeoutPromise(
+  timeoutMs: number,
+  signal?: AbortSignal,
+): Promise<never> {
   return new Promise((_, reject) => {
     const timer = setTimeout(() => {
-      const error = new Error(`Transaction submission timed out after ${timeoutMs}ms`);
-      (error as any).code = 'ETIMEDOUT';
+      const error = new Error(
+        `Transaction submission timed out after ${timeoutMs}ms`,
+      );
+      (error as any).code = "ETIMEDOUT";
       (error as any).isTimeout = true;
       reject(error);
     }, timeoutMs);
-    signal?.addEventListener('abort', () => {
+    signal?.addEventListener("abort", () => {
       clearTimeout(timer);
-      const error = new Error('Transaction submission aborted');
-      (error as any).code = 'ABORTED';
+      const error = new Error("Transaction submission aborted");
+      (error as any).code = "ABORTED";
       reject(error);
     });
   });
@@ -206,13 +249,10 @@ export async function withRetry<T>(
   sequenceRefetch?: SequenceRefetchFn,
   onRetry?: OnRetryFn,
 ): Promise<RetryResult<T>> {
-  const {
-    maxRetries,
-    timeoutMs,
-    baseDelayMs,
-    maxDelayMs,
-    jitterFactor,
-  } = { ...DEFAULT_RETRY_CONFIG, ...config };
+  const { maxRetries, timeoutMs, baseDelayMs, maxDelayMs, jitterFactor } = {
+    ...DEFAULT_RETRY_CONFIG,
+    ...config,
+  };
 
   const startTime = Date.now();
   let lastError: Error | undefined;
@@ -245,10 +285,21 @@ export async function withRetry<T>(
         throw lastError;
       }
 
-      const nextDelayMs = calculateBackoff(attempt, baseDelayMs, maxDelayMs, jitterFactor);
+      const nextDelayMs = calculateBackoff(
+        attempt,
+        baseDelayMs,
+        maxDelayMs,
+        jitterFactor,
+      );
 
       if (onRetry) {
-        onRetry({ attempt, error: lastError, category, willRetry: true, nextDelayMs });
+        onRetry({
+          attempt,
+          error: lastError,
+          category,
+          willRetry: true,
+          nextDelayMs,
+        });
       }
 
       // Sequence mismatch: re-fetch before waiting
@@ -256,9 +307,12 @@ export async function withRetry<T>(
         try {
           await sequenceRefetch();
         } catch (refetchError) {
-          const re = refetchError instanceof Error ? refetchError : new Error(String(refetchError));
+          const re =
+            refetchError instanceof Error
+              ? refetchError
+              : new Error(String(refetchError));
           throw new SDKError(
-            'SEQUENCE_REFETCH_FAILED',
+            "SEQUENCE_REFETCH_FAILED",
             `Failed to re-fetch account sequence after tx_bad_seq: ${re.message}`,
             { cause: re.message },
           );
@@ -269,7 +323,13 @@ export async function withRetry<T>(
     }
   }
 
-  throw lastError || new SDKError('RETRY_EXHAUSTED', 'Retry loop exhausted with no captured error');
+  throw (
+    lastError ||
+    new SDKError(
+      "RETRY_EXHAUSTED",
+      "Retry loop exhausted with no captured error",
+    )
+  );
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -293,28 +353,37 @@ const SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
  * long before it reaches the contract.
  */
 export function validateSlug(slug: string): void {
-  if (typeof slug !== 'string' || slug.length === 0) {
-    throw new SDKError('INVALID_SLUG', 'Slug must be a non-empty string', { value: slug });
+  if (typeof slug !== "string" || slug.length === 0) {
+    throw new SDKError("INVALID_SLUG", "Slug must be a non-empty string", {
+      value: slug,
+    });
   }
   if (slug.length > MAX_SLUG_LENGTH) {
-    throw new SDKError('INVALID_SLUG', `Slug must be at most ${MAX_SLUG_LENGTH} characters`, {
-      value: slug,
-      length: slug.length,
-    });
+    throw new SDKError(
+      "INVALID_SLUG",
+      `Slug must be at most ${MAX_SLUG_LENGTH} characters`,
+      {
+        value: slug,
+        length: slug.length,
+      },
+    );
   }
   if (!SLUG_PATTERN.test(slug)) {
     throw new SDKError(
-      'INVALID_SLUG',
+      "INVALID_SLUG",
       'Slug must be lowercase alphanumeric words separated by single hyphens (e.g. "sneaker-drop-001")',
       { value: slug },
     );
   }
 }
 
-export function assertValidAddress(address: string, fieldName = 'address'): void {
-  if (typeof address !== 'string' || !StrKey.isValidEd25519PublicKey(address)) {
+export function assertValidAddress(
+  address: string,
+  fieldName = "address",
+): void {
+  if (typeof address !== "string" || !StrKey.isValidEd25519PublicKey(address)) {
     throw new SDKError(
-      'INVALID_ADDRESS',
+      "INVALID_ADDRESS",
       `${fieldName} must be a valid Stellar public key`,
       { value: address },
     );
@@ -342,34 +411,51 @@ const I128_MAX = 170_141_183_460_469_231_731_687_303_715_884_105_727n;
  */
 export function toStroops(amount: string | number): bigint {
   let text: string;
-  if (typeof amount === 'number') {
+  if (typeof amount === "number") {
     if (!Number.isFinite(amount)) {
-      throw new SDKError('INVALID_AMOUNT', 'Amount must be a finite number', { value: amount });
+      throw new SDKError("INVALID_AMOUNT", "Amount must be a finite number", {
+        value: amount,
+      });
     }
     text = amount.toFixed(7);
-  } else if (typeof amount === 'string') {
+  } else if (typeof amount === "string") {
     text = amount.trim();
     if (!/^-?\d+(\.\d+)?$/.test(text)) {
-      throw new SDKError('INVALID_AMOUNT', 'Amount must be a decimal string', { value: amount });
+      throw new SDKError("INVALID_AMOUNT", "Amount must be a decimal string", {
+        value: amount,
+      });
     }
   } else {
-    throw new SDKError('INVALID_AMOUNT', 'Amount must be a string or number', { value: amount });
-  }
-
-  if (text.startsWith('-')) {
-    throw new SDKError('INVALID_AMOUNT', 'Amount must be non-negative', { value: amount });
-  }
-
-  const [whole, frac = ''] = text.split('.');
-  if (frac.length > 7) {
-    throw new SDKError('INVALID_AMOUNT', 'Amount has more than 7 decimal places (sub-stroop precision)', {
+    throw new SDKError("INVALID_AMOUNT", "Amount must be a string or number", {
       value: amount,
     });
   }
 
-  const stroops = BigInt(whole) * STROOPS_PER_UNIT + BigInt(frac.padEnd(7, '0'));
+  if (text.startsWith("-")) {
+    throw new SDKError("INVALID_AMOUNT", "Amount must be non-negative", {
+      value: amount,
+    });
+  }
+
+  const [whole, frac = ""] = text.split(".");
+  if (frac.length > 7) {
+    throw new SDKError(
+      "INVALID_AMOUNT",
+      "Amount has more than 7 decimal places (sub-stroop precision)",
+      {
+        value: amount,
+      },
+    );
+  }
+
+  const stroops =
+    BigInt(whole) * STROOPS_PER_UNIT + BigInt(frac.padEnd(7, "0"));
   if (stroops > I128_MAX) {
-    throw new SDKError('INVALID_AMOUNT', 'Amount exceeds the maximum i128 value', { value: amount });
+    throw new SDKError(
+      "INVALID_AMOUNT",
+      "Amount exceeds the maximum i128 value",
+      { value: amount },
+    );
   }
   return stroops;
 }
@@ -378,7 +464,7 @@ export function toStroops(amount: string | number): bigint {
 export function fromStroops(stroops: bigint): string {
   const whole = stroops / 10_000_000n;
   const frac = stroops % 10_000_000n;
-  const fracStr = frac.toString().padStart(7, '0').replace(/0+$/, '');
+  const fracStr = frac.toString().padStart(7, "0").replace(/0+$/, "");
   return fracStr.length > 0 ? `${whole}.${fracStr}` : `${whole}`;
 }
 
@@ -398,3 +484,113 @@ export function truncateAddress(address: string, chars = 6): string {
   return `${address.slice(0, chars)}…${address.slice(-chars)}`;
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// Soroban ScVal Encoding Utilities (Issue #Problem1)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * Encodes a Stellar address to Soroban ScVal format.
+ * @param address Stellar public key (e.g., GXXX...)
+ * @returns Encoded xdr.ScVal
+ */
+export function encodeScAddress(address: string): xdr.ScVal {
+  assertValidAddress(address, "address");
+  return new Address(address).toScVal();
+}
+
+/**
+ * Encodes a 32-bit unsigned integer to Soroban ScVal format.
+ * @param value 32-bit unsigned integer
+ * @returns Encoded xdr.ScVal
+ */
+export function encodeScU32(value: number): xdr.ScVal {
+  if (!Number.isInteger(value) || value < 0 || value > 4_294_967_295) {
+    throw new SDKError(
+      "INVALID_INPUT",
+      "Value must be a 32-bit unsigned integer",
+      { value },
+    );
+  }
+  return xdr.ScVal.scvU32(value);
+}
+
+/**
+ * Encodes a 64-bit unsigned integer to Soroban ScVal format.
+ * @param value 64-bit unsigned integer
+ * @returns Encoded xdr.ScVal
+ */
+export function encodeScU64(value: bigint | number): xdr.ScVal {
+  const bi = typeof value === "number" ? BigInt(value) : value;
+  if (bi < 0n || bi > BigInt("18446744073709551615")) {
+    throw new SDKError(
+      "INVALID_INPUT",
+      "Value must be a 64-bit unsigned integer",
+      { value },
+    );
+  }
+  return xdr.ScVal.scvU64(xdr.Uint64.fromString(bi.toString()));
+}
+
+/**
+ * Encodes a 128-bit signed integer to Soroban ScVal format.
+ * @param value 128-bit signed integer
+ * @returns Encoded xdr.ScVal
+ */
+export function encodeScI128(value: bigint | number): xdr.ScVal {
+  const bi = typeof value === "number" ? BigInt(value) : value;
+  const I128_MIN = -BigInt("170141183460469231731687303715884105728");
+  const I128_MAX = BigInt("170141183460469231731687303715884105727");
+  if (bi < I128_MIN || bi > I128_MAX) {
+    throw new SDKError(
+      "INVALID_INPUT",
+      "Value must be a 128-bit signed integer",
+      { value },
+    );
+  }
+  // Convert to two's complement 128-bit representation
+  const hex = (bi >= 0n ? bi : BigInt(2) ** BigInt(128) + bi)
+    .toString(16)
+    .padStart(32, "0");
+  return xdr.ScVal.scvI128(xdr.Int128Parts.fromXDR(Buffer.from(hex, "hex")));
+}
+
+/**
+ * Encodes a symbol (Soroban Symbol type) to Soroban ScVal format.
+ * @param symbol Symbol name
+ * @returns Encoded xdr.ScVal
+ */
+export function encodeScSymbol(symbol: string): xdr.ScVal {
+  if (typeof symbol !== "string" || symbol.length === 0) {
+    throw new SDKError("INVALID_INPUT", "Symbol must be a non-empty string", {
+      value: symbol,
+    });
+  }
+  return xdr.ScVal.scvSymbol(symbol);
+}
+
+/**
+ * Encodes a boolean to Soroban ScVal format.
+ * @param value Boolean value
+ * @returns Encoded xdr.ScVal
+ */
+export function encodeScBool(value: boolean): xdr.ScVal {
+  return xdr.ScVal.scvBool(value);
+}
+
+/**
+ * Encodes a byte array to Soroban ScVal format.
+ * @param bytes Byte array
+ * @returns Encoded xdr.ScVal
+ */
+export function encodeScBytes(bytes: Buffer | Uint8Array): xdr.ScVal {
+  if (!(bytes instanceof Buffer || bytes instanceof Uint8Array)) {
+    throw new SDKError(
+      "INVALID_INPUT",
+      "Bytes must be a Buffer or Uint8Array",
+      { type: typeof bytes },
+    );
+  }
+  // Convert to Buffer if needed for xdr.ScVal.scvBytes()
+  const buffer = bytes instanceof Buffer ? bytes : Buffer.from(bytes);
+  return xdr.ScVal.scvBytes(buffer);
+}
