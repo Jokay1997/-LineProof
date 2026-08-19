@@ -111,12 +111,6 @@ impl QueueImpl {
         env.storage()
             .persistent()
             .extend_ttl(&version_key, TTL_THRESHOLD, TTL_EXTEND_TO);
-        env.storage()
-            .persistent()
-            .extend_ttl(&env.current_contract_address(), TTL_THRESHOLD, TTL_EXTEND_TO);
-        env.storage()
-            .persistent()
-            .extend_ttl(&key_idx, TTL_THRESHOLD, TTL_EXTEND_TO);
         env.storage().instance().extend_ttl(TTL_THRESHOLD, TTL_EXTEND_TO);
         emit(&env, Symbol::new(&env, "Initialized"), 0, &admin, 0);
     }
@@ -166,11 +160,8 @@ impl QueueImpl {
     pub fn open_enrollment(env: Env, admin: Address) {
         let mut config = Self::get_config_internal(&env);
         Self::require_admin(&config, &admin);
-        if matches!(config.status, QueueStatus::Closed) {
-            panic!("queue is closed");
-        }
-        if matches!(config.status, QueueStatus::EnrollmentOpen) {
-            panic!("already open");
+        if !matches!(config.status, QueueStatus::Draft) {
+            panic!("enrollment can only be opened from draft state");
         }
         config.status = QueueStatus::EnrollmentOpen;
         let key_config = Symbol::new(&env, "config");
@@ -190,8 +181,8 @@ impl QueueImpl {
     pub fn close_enrollment(env: Env, admin: Address) {
         let mut config = Self::get_config_internal(&env);
         Self::require_admin(&config, &admin);
-        if matches!(config.status, QueueStatus::Closed) {
-            panic!("queue is closed");
+        if !matches!(config.status, QueueStatus::EnrollmentOpen) {
+            panic!("enrollment can only be closed from enrollment_open state");
         }
         config.status = QueueStatus::EnrollmentClosed;
         let key_config = Symbol::new(&env, "config");
@@ -389,6 +380,9 @@ impl QueueImpl {
     pub fn close(env: Env, admin: Address) {
         let mut config = Self::get_config_internal(&env);
         Self::require_admin(&config, &admin);
+        if matches!(config.status, QueueStatus::Closed) {
+            panic!("queue is closed");
+        }
         config.status = QueueStatus::Closed;
         let key_config = Symbol::new(&env, "config");
         env.storage().persistent().set(&key_config, &config);
