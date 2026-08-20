@@ -2,6 +2,7 @@ import { QueueStatus, transitionQueueStatus } from '../schemas/queueStatus.js';
 export { QueueStatus };
 import { defaultMemoryAdapter, type StorageAdapter } from '../storage/index.js';
 import { serviceEmitter } from './eventEmitter.js';
+import { enrollmentService as defaultEnrollmentService, type EnrollmentService } from './enrollmentService.js';
 
 export type Queue = {
   id: string;
@@ -91,6 +92,7 @@ export interface QueueService {
 export function createQueueService(
   store: StorageAdapter = defaultMemoryAdapter,
   fixtures: Queue[] = defaultFixtures(),
+  enrollmentSvc: EnrollmentService = defaultEnrollmentService,
 ): QueueService {
   // Seed fixtures that are not already present. `set` is idempotent, so
   // re-seeding never clears rows created at runtime.
@@ -131,12 +133,20 @@ export function createQueueService(
     getQueueStats: (id) => {
       const queue = getQueueById(id);
       if (!queue) return undefined;
+      // `queue.enrolled` is an ever-enrolled audit figure seeded from fixtures
+      // and does not exclude cancelled positions (see contracts issue #181:
+      // total_enrolled() has the same "ever enrolled" semantics on-chain).
+      // Where the enrollment service has tracked live (non-cancelled)
+      // enrollments for this queue, prefer that count for capacity/percentage
+      // math so operators see the active count, not an inflated total.
+      const activeEnrollments = enrollmentSvc.getEnrollmentsByQueue(queue.id).length;
+      const activeEnrolled = activeEnrollments > 0 ? activeEnrollments : queue.enrolled;
       return {
         queueId: queue.id,
-        total: queue.enrolled,
+        total: activeEnrolled,
         advanced: queue.advanced,
-        remaining: queue.enrolled - queue.advanced,
-        percentAdvanced: queue.enrolled > 0 ? Math.round((queue.advanced / queue.enrolled) * 100) : 0,
+        remaining: activeEnrolled - queue.advanced,
+        percentAdvanced: activeEnrolled > 0 ? Math.round((queue.advanced / activeEnrolled) * 100) : 0,
       };
     },
     createQueue: (payload) => {
