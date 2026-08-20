@@ -1,11 +1,9 @@
 use soroban_sdk::{
     testutils::{Address as _, Events as _},
-    Address, Env, Symbol, TryFromVal, Vec,
+    Address, Env, Symbol, TryFromVal,
 };
 
-use crate::{AdvancementRule, Position, PositionStatus, Queue, QueueConfig, QueueImpl, QueueImplClient, QueueStatus};
 use crate::{AdvancementRule, Position, PositionStatus, QueueConfig, QueueImpl, QueueImplClient, QueueStatus};
-use crate::{AdvancementRule, PositionStatus, QueueConfig, QueueImpl, QueueImplClient, QueueStatus};
 
 fn setup() -> (Env, Address, Address) {
     let env = Env::default();
@@ -31,12 +29,6 @@ fn make_config(env: &Env, admin: &Address) -> QueueConfig {
 
 #[test]
 fn test_initialize_persists_config() {
-    let env = Env::default();
-    let admin = Address::generate(&env);
-    let contract_id = env.register(QueueImpl, ());
-    env.mock_all_auths();
-    let client = QueueImplClient::new(&env, &contract_id);
-    let config = make_config(&env, &admin);
     let (env, admin, contract_id) = setup();
     let config = make_config(&env, &admin);
     let client = QueueImplClient::new(&env, &contract_id);
@@ -92,12 +84,6 @@ fn test_admin_transfer_proposal_overwrites_pending() {
 
 #[test]
 fn test_open_enrollment() {
-    let env = Env::default();
-    let admin = Address::generate(&env);
-    let contract_id = env.register(QueueImpl, ());
-    env.mock_all_auths();
-    let client = QueueImplClient::new(&env, &contract_id);
-    let config = make_config(&env, &admin);
     let (env, admin, contract_id) = setup();
     let config = make_config(&env, &admin);
     let client = QueueImplClient::new(&env, &contract_id);
@@ -109,12 +95,6 @@ fn test_open_enrollment() {
 
 #[test]
 fn test_close_enrollment() {
-    let env = Env::default();
-    let admin = Address::generate(&env);
-    let contract_id = env.register(QueueImpl, ());
-    env.mock_all_auths();
-    let client = QueueImplClient::new(&env, &contract_id);
-    let config = make_config(&env, &admin);
     let (env, admin, contract_id) = setup();
     let config = make_config(&env, &admin);
     let client = QueueImplClient::new(&env, &contract_id);
@@ -127,12 +107,6 @@ fn test_close_enrollment() {
 
 #[test]
 fn test_advance_updates_positions() {
-    let env = Env::default();
-    let admin = Address::generate(&env);
-    let contract_id = env.register(QueueImpl, ());
-    env.mock_all_auths();
-    let client = QueueImplClient::new(&env, &contract_id);
-    let config = make_config(&env, &admin);
     let (env, admin, contract_id) = setup();
     let config = make_config(&env, &admin);
     let client = QueueImplClient::new(&env, &contract_id);
@@ -152,8 +126,6 @@ fn test_advance_updates_positions() {
     let loaded1 = client.get_position(&1).unwrap();
     assert!(matches!(loaded1.status, PositionStatus::Advanced));
     assert!(loaded1.advanced_at.is_some());
-
-    let loaded2 = client.get_position(&2).unwrap();
 
     let pos1 = Position {
         position_id: 1,
@@ -178,7 +150,8 @@ fn test_advance_updates_positions() {
         env.storage().persistent().set(&Symbol::new(&env, "idx"), &0u32);
     });
 
-    client.close_enrollment(&admin);
+    // Queue is already AdvancementActive from the first advance() call above,
+    // so advance() can be called again directly without re-closing enrollment.
     let advanced = client.advance(&admin, &2);
     assert_eq!(advanced.len(), 2);
 
@@ -203,10 +176,6 @@ fn test_advance_updates_positions() {
 #[test]
 #[should_panic(expected = "queue not initialized")]
 fn test_get_config_panics_when_missing() {
-    let env = Env::default();
-    let _admin = Address::generate(&env);
-    let contract_id = env.register(QueueImpl, ());
-    env.mock_all_auths();
     let (env, _admin, contract_id) = setup();
     let client = QueueImplClient::new(&env, &contract_id);
     let _ = client.get_config();
@@ -214,15 +183,6 @@ fn test_get_config_panics_when_missing() {
 
 #[test]
 fn test_current_position_index() {
-    let env = Env::default();
-    let admin = Address::generate(&env);
-    let contract_id = env.register(QueueImpl, ());
-    env.mock_all_auths();
-    let client = QueueImplClient::new(&env, &contract_id);
-    let config = make_config(&env, &admin);
-    client.initialize(&admin, &config);
-    assert_eq!(client.current_position_index(), 0);
-    assert_eq!(client.current_position_index(), 0);
     let (env, admin, contract_id) = setup();
     let config = make_config(&env, &admin);
     let client = QueueImplClient::new(&env, &contract_id);
@@ -236,12 +196,6 @@ fn test_current_position_index() {
 
 #[test]
 fn test_enroll_position_creates_pending() {
-    let env = Env::default();
-    let admin = Address::generate(&env);
-    let contract_id = env.register(QueueImpl, ());
-    env.mock_all_auths();
-    let client = QueueImplClient::new(&env, &contract_id);
-    let config = make_config(&env, &admin);
     let (env, admin, contract_id) = setup();
     let config = make_config(&env, &admin);
     let client = QueueImplClient::new(&env, &contract_id);
@@ -260,13 +214,6 @@ fn test_enroll_position_creates_pending() {
 #[test]
 #[should_panic(expected = "enrollment is not open")]
 fn test_enroll_position_rejects_when_not_open() {
-    let env = Env::default();
-    let admin = Address::generate(&env);
-    let contract_id = env.register(QueueImpl, ());
-    env.mock_all_auths();
-    let client = QueueImplClient::new(&env, &contract_id);
-    let config = make_config(&env, &admin);
-    client.initialize(&admin, &config);
     let (env, admin, contract_id) = setup();
     let config = make_config(&env, &admin);
     let client = QueueImplClient::new(&env, &contract_id);
@@ -278,12 +225,6 @@ fn test_enroll_position_rejects_when_not_open() {
 
 #[test]
 fn test_cancel_position() {
-    let env = Env::default();
-    let admin = Address::generate(&env);
-    let contract_id = env.register(QueueImpl, ());
-    env.mock_all_auths();
-    let client = QueueImplClient::new(&env, &contract_id);
-    let config = make_config(&env, &admin);
     let (env, admin, contract_id) = setup();
     let config = make_config(&env, &admin);
     let client = QueueImplClient::new(&env, &contract_id);
@@ -301,12 +242,6 @@ fn test_cancel_position() {
 #[test]
 #[should_panic(expected = "not your position")]
 fn test_cancel_position_wrong_identity() {
-    let env = Env::default();
-    let admin = Address::generate(&env);
-    let contract_id = env.register(QueueImpl, ());
-    env.mock_all_auths();
-    let client = QueueImplClient::new(&env, &contract_id);
-    let config = make_config(&env, &admin);
     let (env, admin, contract_id) = setup();
     let config = make_config(&env, &admin);
     let client = QueueImplClient::new(&env, &contract_id);
@@ -321,12 +256,6 @@ fn test_cancel_position_wrong_identity() {
 
 #[test]
 fn test_total_enrolled() {
-    let env = Env::default();
-    let admin = Address::generate(&env);
-    let contract_id = env.register(QueueImpl, ());
-    env.mock_all_auths();
-    let client = QueueImplClient::new(&env, &contract_id);
-    let config = make_config(&env, &admin);
     let (env, admin, contract_id) = setup();
     let config = make_config(&env, &admin);
     let client = QueueImplClient::new(&env, &contract_id);
@@ -343,12 +272,6 @@ fn test_total_enrolled() {
 
 #[test]
 fn test_close() {
-    let env = Env::default();
-    let admin = Address::generate(&env);
-    let contract_id = env.register(QueueImpl, ());
-    env.mock_all_auths();
-    let client = QueueImplClient::new(&env, &contract_id);
-    let config = make_config(&env, &admin);
     let (env, admin, contract_id) = setup();
     let config = make_config(&env, &admin);
     let client = QueueImplClient::new(&env, &contract_id);
@@ -361,14 +284,6 @@ fn test_close() {
 #[test]
 #[should_panic(expected = "enrollment must be closed before advancing")]
 fn test_advance_requires_enrollment_closed() {
-    let env = Env::default();
-    let admin = Address::generate(&env);
-    let contract_id = env.register(QueueImpl, ());
-    env.mock_all_auths();
-    let client = QueueImplClient::new(&env, &contract_id);
-    let config = make_config(&env, &admin);
-    client.initialize(&admin, &config);
-    client.open_enrollment(&admin);
     let (env, admin, contract_id) = setup();
     let config = make_config(&env, &admin);
     let client = QueueImplClient::new(&env, &contract_id);
@@ -380,12 +295,6 @@ fn test_advance_requires_enrollment_closed() {
 
 #[test]
 fn test_advance_stays_in_advancement_active() {
-    let env = Env::default();
-    let admin = Address::generate(&env);
-    let contract_id = env.register(QueueImpl, ());
-    env.mock_all_auths();
-    let client = QueueImplClient::new(&env, &contract_id);
-    let config = make_config(&env, &admin);
     let (env, admin, contract_id) = setup();
     let config = make_config(&env, &admin);
     let client = QueueImplClient::new(&env, &contract_id);
@@ -415,19 +324,6 @@ fn test_advance_stays_in_advancement_active() {
 
 #[test]
 fn test_get_position_by_id() {
-    let env = Env::default();
-    let admin = Address::generate(&env);
-    let contract_id = env.register(QueueImpl, ());
-    env.mock_all_auths();
-    let client = QueueImplClient::new(&env, &contract_id);
-    let config = make_config(&env, &admin);
-    client.initialize(&admin, &config);
-    client.open_enrollment(&admin);
-
-    let user = Address::generate(&env);
-    client.enroll_position(&user);
-
-    let loaded = client.get_position(&1).unwrap();
     let (env, admin, contract_id) = setup();
     let config = make_config(&env, &admin);
     let client = QueueImplClient::new(&env, &contract_id);
@@ -454,12 +350,9 @@ fn test_get_position_by_id() {
 #[test]
 #[should_panic(expected = "queue is closed")]
 fn test_advance_closed_queue_panics() {
-    let env = Env::default();
-    let admin = Address::generate(&env);
-    let contract_id = env.register(QueueImpl, ());
-    env.mock_all_auths();
-    let client = QueueImplClient::new(&env, &contract_id);
+    let (env, admin, contract_id) = setup();
     let config = make_config(&env, &admin);
+    let client = QueueImplClient::new(&env, &contract_id);
     client.initialize(&admin, &config);
     client.open_enrollment(&admin);
     client.close_enrollment(&admin);
@@ -468,17 +361,61 @@ fn test_advance_closed_queue_panics() {
 }
 
 #[test]
-#[should_panic(expected = "queue is closed")]
-fn test_open_enrollment_after_close_panics() {
-    let env = Env::default();
-    let admin = Address::generate(&env);
-    let contract_id = env.register(QueueImpl, ());
-    env.mock_all_auths();
-    let client = QueueImplClient::new(&env, &contract_id);
+#[should_panic(expected = "enrollment can only be opened from draft state")]
+fn test_reopen_closed_queue_panics() {
+    let (env, admin, contract_id) = setup();
     let config = make_config(&env, &admin);
+    let client = QueueImplClient::new(&env, &contract_id);
     client.initialize(&admin, &config);
     client.close(&admin);
+    // Queue is Closed — reopening must panic
     client.open_enrollment(&admin);
+}
+
+#[test]
+#[should_panic(expected = "enrollment can only be opened from draft state")]
+fn test_reopen_advancement_active_panics() {
+    let (env, admin, contract_id) = setup();
+    let config = make_config(&env, &admin);
+    let client = QueueImplClient::new(&env, &contract_id);
+    client.initialize(&admin, &config);
+    client.open_enrollment(&admin);
+
+    let user = Address::generate(&env);
+    client.enroll_position(&user);
+    client.close_enrollment(&admin);
+    client.advance(&admin, &1);
+
+    let cfg = client.get_config();
+    assert!(matches!(cfg.status, QueueStatus::AdvancementActive));
+
+    // Queue is AdvancementActive — reopening must panic
+    client.open_enrollment(&admin);
+}
+
+#[test]
+#[should_panic(expected = "enrollment can only be closed from enrollment_open state")]
+fn test_close_enrollment_from_draft_panics() {
+    let (env, admin, contract_id) = setup();
+    let config = make_config(&env, &admin);
+    let client = QueueImplClient::new(&env, &contract_id);
+    client.initialize(&admin, &config);
+    // Queue is still Draft — close_enrollment must panic instead of silently
+    // skipping the enrollment window.
+    client.close_enrollment(&admin);
+}
+
+#[test]
+#[should_panic(expected = "enrollment can only be closed from enrollment_open state")]
+fn test_close_enrollment_twice_panics() {
+    let (env, admin, contract_id) = setup();
+    let config = make_config(&env, &admin);
+    let client = QueueImplClient::new(&env, &contract_id);
+    client.initialize(&admin, &config);
+    client.open_enrollment(&admin);
+    client.close_enrollment(&admin);
+    // Queue is EnrollmentClosed — closing enrollment again must panic
+    client.close_enrollment(&admin);
 }
 
 #[test]
@@ -599,9 +536,9 @@ fn test_advance_with_cancelled_positions_emits_skipped() {
     let user2 = Address::generate(&env);
     let user3 = Address::generate(&env);
 
-    let pos1 = client.enroll_position(&user1); // id=1
+    let _pos1 = client.enroll_position(&user1); // id=1
     let pos2 = client.enroll_position(&user2); // id=2
-    let pos3 = client.enroll_position(&user3); // id=3
+    let _pos3 = client.enroll_position(&user3); // id=3
 
     // Cancel position 2
     client.cancel_position(&user2, &pos2);
@@ -613,8 +550,8 @@ fn test_advance_with_cancelled_positions_emits_skipped() {
 
     // Only 2 positions should be advanced (pos1 and pos3)
     assert_eq!(advanced.len(), 2);
-    assert!(advanced.iter().any(|&id| id == 1));
-    assert!(advanced.iter().any(|&id| id == 3));
+    assert!(advanced.iter().any(|id| id == 1));
+    assert!(advanced.iter().any(|id| id == 3));
 
     // Verify pos1 and pos3 are Advanced
     let loaded1 = client.get_position(&1).unwrap();
@@ -651,14 +588,14 @@ fn test_advance_from_advancement_active_state() {
     // First advance: batch_size=2, advances pos1 and pos2
     let advanced1 = client.advance(&admin, &2);
     assert_eq!(advanced1.len(), 2);
-    assert!(advanced1.iter().any(|&id| id == 1));
-    assert!(advanced1.iter().any(|&id| id == 2));
+    assert!(advanced1.iter().any(|id| id == 1));
+    assert!(advanced1.iter().any(|id| id == 2));
 
     // Second advance should work (queue is now AdvancementActive)
     let advanced2 = client.advance(&admin, &2);
     assert_eq!(advanced2.len(), 2);
-    assert!(advanced2.iter().any(|&id| id == 3));
-    assert!(advanced2.iter().any(|&id| id == 4));
+    assert!(advanced2.iter().any(|id| id == 3));
+    assert!(advanced2.iter().any(|id| id == 4));
 
     // Verify all 4 are Advanced
     for id in 1..=4 {
