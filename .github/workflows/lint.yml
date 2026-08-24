@@ -5,6 +5,17 @@ on:
   pull_request:
 
 jobs:
+  lint-json:
+    name: Validate package.json Files
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+      - name: Validate JSON structure (rejects duplicate/malformed keys)
+        run: node scripts/check_package_json.mjs
+
   lint-rust:
     name: Rust Lint
     runs-on: ubuntu-latest
