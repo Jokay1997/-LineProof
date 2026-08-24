@@ -8,6 +8,9 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Removed
+- [sdk] Removed duplicate `generateKeypair()` from `types.ts` (unused; use `generateTestKeypair()` from `@lineproof/sdk/testing` instead)
+
 ### Added
 - [contracts/escrow] `get_total_held` function tracking running deposit totals per queue
 - [contracts/escrow] `Expired` status now correctly persisted in `expire()` and guarded against non-Active records

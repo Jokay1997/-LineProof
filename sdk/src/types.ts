@@ -1,4 +1,4 @@
-import { Networks, Keypair, StrKey } from '@stellar/stellar-sdk';
+import { Networks, StrKey } from '@stellar/stellar-sdk';
 
 export interface LineProofConfig {
   /** Horizon REST endpoint for classic Stellar operations (e.g. https://horizon-testnet.stellar.org). */
@@ -165,10 +165,6 @@ export const DEFAULT_LINEPROOF_CONFIG = {
   timeoutMs: 30_000,
   maxRetries: 3,
 };
-
-export function generateKeypair(): ReturnType<typeof Keypair.random> {
-  return Keypair.random();
-}
 
 export function validateAddress(address: string): void {
   if (!StrKey.isValidEd25519PublicKey(address)) {
