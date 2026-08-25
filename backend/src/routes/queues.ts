@@ -4,6 +4,7 @@ import { listQueues, getQueueById, createQueue, advanceQueue, closeQueue, getQue
 import { readQueueOnChain } from '../contracts/index.js';
 import { SlugSchema } from '../schemas/slug.js';
 import { NotFoundError, ValidationError } from '../errors/index.js';
+import { QueueStatus } from '../schemas/queueStatus.js';
 
 const router: IRouter = Router();
 
@@ -31,7 +32,7 @@ const AdvanceSchema = z.object({
 }).strict();
 
 const GetQueuesQuerySchema = z.object({
-  status: z.string().optional(),
+  status: z.enum(Object.values(QueueStatus) as [string, ...string[]]).optional(),
   limit: z.preprocess(
     (val) => (val === undefined ? undefined : Number(val)),
     z.number().int().min(1).max(100).default(20)
@@ -52,7 +53,7 @@ router.get('/', (req, res: Response): Response => {
   const queues = listQueues();
 
   let filtered = queues;
-  if (status && typeof status === 'string') {
+  if (status) {
     filtered = queues.filter((q) => q.status === status);
   }
 

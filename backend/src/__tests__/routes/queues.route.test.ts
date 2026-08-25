@@ -67,15 +67,21 @@ describe('Queues Routes', () => {
 
     it('passes status filter to service', async () => {
       const mockList = [
-        { id: 'q1', slug: 'q1', status: 'Open' },
+        { id: 'q1', slug: 'q1', status: 'EnrollmentOpen' },
         { id: 'q2', slug: 'q2', status: 'Closed' },
       ];
       vi.mocked(queueService.listQueues).mockReturnValue(mockList as any);
 
-      const res = await request(app).get('/api/queues?status=Open');
+      const res = await request(app).get('/api/queues?status=EnrollmentOpen');
       expect(res.status).toBe(200);
-      expect(res.body.items).toEqual([{ id: 'q1', slug: 'q1', status: 'Open' }]);
+      expect(res.body.items).toEqual([{ id: 'q1', slug: 'q1', status: 'EnrollmentOpen' }]);
       expect(res.body.total).toBe(1);
+    });
+
+    it('returns 400 for invalid status value', async () => {
+      const res = await request(app).get('/api/queues?status=UnknownStatus');
+      expect(res.status).toBe(400);
+      expect(res.body.message).toContain('Invalid query parameters');
     });
   });
 
