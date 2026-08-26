@@ -37,15 +37,20 @@ async function run(): Promise<void> {
   const queue = new QueueClient(client, { queueContractId });
   const enrollment = new EnrollmentClient(client, queueContractId);
 
-  // Concert ticket queue example demonstrating Time-in-Wait advancement
-  // for a fixed-capacity, escrow-backed, non-transferable ticket allocation.
-  console.log('Concert ticket example ready.', { queueContractId });
+  // University admissions waitlist using priority-tier advancement instead
+  // of plain FIFO — see README.md for how tier weights are configured.
+  console.log('University admissions example ready.', { queueContractId });
 
-  // Uncomment once you have a live testnet queue with at least one enrollee:
+  // SDK client initialization: done above via createDevEnv().
+  // Queue lookup:
   // const position = await queue.getPosition(1);
   // console.log('Queue position:', position);
+  // Enrollment check:
   // const isEnrolled = await enrollment.isEnrolled(queueContractId, '<G... address>');
   // console.log('Is enrolled:', isEnrolled);
+  //
+  // Priority-tier submission is not yet implemented in this example — see
+  // README.md's "Priority Tiers" section for the off-chain/on-chain split.
 
   void enrollment;
 }
