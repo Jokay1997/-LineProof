@@ -246,7 +246,13 @@ fn test_destroy_removes_queue_and_allows_slug_reuse() {
     assert!(QueueFactoryImpl::get_queue(env.clone(), slug.clone()).is_none());
     assert_eq!(QueueFactoryImpl::queue_count(env.clone()), 0);
 
-    QueueFactoryImpl::register_queue(env.clone(), admin.clone(), slug.clone(), BytesN::new(&env, &[9u8; 32]), 1);
+    QueueFactoryImpl::register_queue(
+        env.clone(),
+        admin.clone(),
+        slug.clone(),
+        BytesN::new(&env, &[9u8; 32]),
+        1,
+    );
     assert_eq!(QueueFactoryImpl::list_queues(env.clone()).len(), 1);
 
     QueueFactoryImpl::register_queue(

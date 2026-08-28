@@ -2,4 +2,3 @@ packages:
   - 'sdk'
   - 'backend'
   - 'frontend'
-  - 'examples/*'
