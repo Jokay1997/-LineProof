@@ -93,10 +93,12 @@ export const submitEnrollment = (
 export const submitEscrowDeposit = (
   amount: number,
   asset: string,
+  queueId: string,
 ): Promise<string> => {
   const sdk = requireWriter();
+  const caller = sdk.client.publicKey!;
   return submit(() =>
-    sdk.escrow.deposit(sdk.contractIds.escrow!, amount, asset),
+    sdk.escrow.deposit(sdk.contractIds.escrow!, caller, queueId, BigInt(amount), asset),
   );
 };
 
@@ -105,12 +107,14 @@ export const submitQueueAdvance = (
   batchSize: number,
 ): Promise<number[]> => {
   const sdk = requireWriter();
-  return submit(() => sdk.queue(queueContractId).advance(batchSize));
+  const admin = sdk.client.publicKey!;
+  return submit(() => sdk.queue(queueContractId).advance(admin, batchSize));
 };
 
 export const submitQueueClose = (queueContractId: string): Promise<string> => {
   const sdk = requireWriter();
-  return submit(() => sdk.queue(queueContractId).close());
+  const admin = sdk.client.publicKey!;
+  return submit(() => sdk.queue(queueContractId).close(admin));
 };
 
 export async function readEnrollmentOnChain(

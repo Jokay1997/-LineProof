@@ -106,7 +106,7 @@ fn test_finalize_enrollment() {
     let queue_id = Symbol::new(&env, "fin-q");
     EnrollmentImpl::enroll(env.clone(), user.clone(), queue_id.clone());
     EnrollmentImpl::finalize_enrollment(env.clone(), admin.clone(), user.clone(), queue_id.clone());
-    let record = EnrollmentImpl::enrollment_record(env, user, queue_id).unwrap();
+    let record = EnrollmentImpl::enrollment_record(env.clone(), user, queue_id).unwrap();
     let contract_id = env.register(EnrollmentImpl, ());
     let client = EnrollmentImplClient::new(&env, &contract_id);
     let user = Address::generate(&env);

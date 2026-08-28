@@ -1,6 +1,4 @@
 use crate::{BindingStatus, Identity, IdentityImpl};
-use crate::{BindingStatus, IdentityImpl};
-use soroban_sdk::{testutils::Address as _, Address, Env, Symbol};
 use soroban_sdk::{testutils::Address as _, Address, Env, Symbol};
 
 fn setup() -> (Env, Address) {

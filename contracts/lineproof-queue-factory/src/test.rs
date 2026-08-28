@@ -158,7 +158,6 @@ fn test_upgrade_rejects_downgrade() {
     let (env, admin) = setup();
     init(&env, &admin);
     QueueFactoryImpl::set_config(env.clone(), admin.clone(), 1, 3);
-    let slug = Symbol::new(&env, "secure");
     let slug = Symbol::new(&env, "downgrade");
     QueueFactoryImpl::register_queue(
         env.clone(),
@@ -209,7 +208,7 @@ fn test_deploy_rejects_unapproved_hash() {
 
 #[test]
 #[should_panic(expected = "WASM hash not approved")]
-fn test_upgrade_rejects_unapproved_hash() {
+fn test_upgrade_rejects_unapproved_hash_v2() {
     let (env, admin) = setup();
     init(&env, &admin);
     QueueFactoryImpl::set_config(env.clone(), admin.clone(), 1, 2);
@@ -240,7 +239,6 @@ fn test_destroy_removes_queue_and_allows_slug_reuse() {
         admin.clone(),
         slug.clone(),
         BytesN::new(&env, &[8u8; 32]),
-        soroban_sdk::BytesN::new(&env, &[5u8; 32]),
         1,
     );
 
@@ -248,8 +246,8 @@ fn test_destroy_removes_queue_and_allows_slug_reuse() {
     assert!(QueueFactoryImpl::get_queue(env.clone(), slug.clone()).is_none());
     assert_eq!(QueueFactoryImpl::queue_count(env.clone()), 0);
 
-    QueueFactoryImpl::register_queue(env.clone(), admin, slug.clone(), BytesN::new(&env, &[9u8; 32]), 1);
-    assert_eq!(QueueFactoryImpl::list_queues(env.clone()).len(), 0);
+    QueueFactoryImpl::register_queue(env.clone(), admin.clone(), slug.clone(), BytesN::new(&env, &[9u8; 32]), 1);
+    assert_eq!(QueueFactoryImpl::list_queues(env.clone()).len(), 1);
 
     QueueFactoryImpl::register_queue(
         env.clone(),

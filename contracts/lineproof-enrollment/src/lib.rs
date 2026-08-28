@@ -158,9 +158,6 @@ impl Enrollment for EnrollmentImpl {
         env.storage()
             .persistent()
             .extend_ttl(&key, TTL_THRESHOLD, TTL_EXTEND_TO);
-        env.storage()
-            .persistent()
-            .extend_ttl(&key, TTL_THRESHOLD, TTL_EXTEND_TO);
 
         // Increment enrollment count
         let count_key = Self::count_key(&env, &queue_id);
@@ -238,9 +235,6 @@ impl Enrollment for EnrollmentImpl {
         env.storage()
             .persistent()
             .set(&Symbol::new(&env, "dup_behavior"), &behavior);
-        env.storage()
-            .persistent()
-            .extend_ttl(&Symbol::new(&env, "dup_behavior"), TTL_THRESHOLD, TTL_EXTEND_TO);
         env.storage()
             .persistent()
             .extend_ttl(&Symbol::new(&env, "dup_behavior"), TTL_THRESHOLD, TTL_EXTEND_TO);

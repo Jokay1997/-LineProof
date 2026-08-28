@@ -2,12 +2,10 @@ import 'dotenv/config';
 import { createApp } from './app.js';
 import { config, validateStartupConfig } from './config.js';
 import { lineproofClient } from './contracts/lineproofClient.js';
-import { corsOriginsFromEnvironment } from './middleware/corsConfig.js';
 import { EventIndexer } from './services/eventIndexer.js';
 
 validateStartupConfig(config);
-const allowedOrigins = corsOriginsFromEnvironment();
-const app = createApp(allowedOrigins);
+const app = createApp();
 console.log(
   lineproofClient ? `[contracts] configured mode (${lineproofClient.canWrite ? 'read/write' : 'read-only; OPERATOR_SECRET_KEY absent'})` : '[contracts] mock mode (no contract IDs configured)',
 );

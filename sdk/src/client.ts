@@ -84,6 +84,10 @@ export class LineProofClient {
     this.sorobanServer = new SorobanRpc.Server(sorobanRpcUrl);
   }
 
+  get publicKey(): string | undefined {
+    return this.sourcePublic;
+  }
+
   get retryConfig(): RetryConfig {
     return {
       maxRetries: this.maxRetries,

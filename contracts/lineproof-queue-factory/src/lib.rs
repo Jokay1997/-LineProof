@@ -232,8 +232,6 @@ impl QueueFactory for QueueFactoryImpl {
             slug,
             BytesN::new(&env, &[0u8; 32]),
             0,
-            metadata.contract_id,
-            metadata.version,
             env.ledger().timestamp(),
         );
     }
