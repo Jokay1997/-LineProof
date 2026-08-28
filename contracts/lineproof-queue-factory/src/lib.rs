@@ -1,3 +1,5 @@
+#![no_std]
+
 use soroban_sdk::{contract, contractimpl, contracttype, Address, BytesN, Env, Symbol, Vec};
 
 /// Storage key prefix for queue registry
@@ -91,7 +93,7 @@ impl QueueFactory for QueueFactoryImpl {
             &env,
             Symbol::new(&env, "Init"),
             Symbol::new(&env, ""),
-            BytesN::new(&env, &[0u8; 32]),
+            BytesN::from_array(&env, &[0u8; 32]),
             0,
             0,
         );
@@ -117,7 +119,9 @@ impl QueueFactory for QueueFactoryImpl {
         if env.storage().persistent().has(&registry_key) {
             panic!("queue with this slug already exists");
         }
-        let contract_id = env.deployer().with_current_contract(&wasm_hash).deploy();
+        let salt = BytesN::from_array(&env, &env.ledger().timestamp().to_be_bytes());
+        let contract_address = env.deployer().with_current_contract(salt).deploy(wasm_hash);
+        let contract_id: BytesN<32> = contract_address.into();
         let deployed_at = env.ledger().timestamp();
         let metadata = QueueMetadata {
             slug: slug.clone(),
@@ -172,6 +176,29 @@ impl QueueFactory for QueueFactoryImpl {
             contract_id,
             version,
             deployed_at,
+        );
+    }
+
+    fn register_approved_hash(env: Env, admin: Address, version: u32, wasm_hash: BytesN<32>) {
+        Self::require_admin(&env, &admin);
+        let key = Self::approved_hash_key(&env, version);
+        env.storage().persistent().set(&key, &wasm_hash);
+        env.storage()
+            .persistent()
+            .extend_ttl(&key, TTL_THRESHOLD, TTL_EXTEND_TO);
+        // Enable the approved hash registry after first hash is registered
+        let enabled_key = Symbol::new(&env, APPROVED_REGISTRY_ENABLED_KEY);
+        env.storage().persistent().set(&enabled_key, &true);
+        env.storage()
+            .persistent()
+            .extend_ttl(&enabled_key, TTL_THRESHOLD, TTL_EXTEND_TO);
+        emit(
+            &env,
+            Symbol::new(&env, "HashApproved"),
+            Symbol::new(&env, ""),
+            wasm_hash,
+            version,
+            env.ledger().timestamp(),
         );
     }
 
@@ -230,7 +257,7 @@ impl QueueFactory for QueueFactoryImpl {
             &env,
             Symbol::new(&env, "Destroyed"),
             slug,
-            BytesN::new(&env, &[0u8; 32]),
+            BytesN::from_array(&env, &[0u8; 32]),
             0,
             env.ledger().timestamp(),
         );
@@ -285,7 +312,6 @@ impl QueueFactory for QueueFactoryImpl {
         }
         Self::validate_approved_hash(&env, new_version, &new_wasm_hash);
         Self::require_approved_hash(&env, new_version, &new_wasm_hash);
-        let contract_id = metadata.contract_id.clone();
         metadata.version = new_version;
         let registry_key = Self::queue_registry_key(&env, &slug);
         env.storage().persistent().set(&registry_key, &metadata);
@@ -294,14 +320,13 @@ impl QueueFactory for QueueFactoryImpl {
             .extend_ttl(&registry_key, TTL_THRESHOLD, TTL_EXTEND_TO);
         // Upgrade the WASM code. The queue contract should call migrate() afterward
         // if storage transformations are needed for the new version.
-        env.deployer()
-            .with_current_contract(&new_wasm_hash)
-            .upgrade(&contract_id);
+        let contract_address: Address = metadata.contract_id.clone().into();
+        env.deployer().update_current_contract_wasm(new_wasm_hash);
         emit(
             &env,
             Symbol::new(&env, "Upgraded"),
             slug,
-            contract_id,
+            metadata.contract_id.clone(),
             new_version,
             env.ledger().timestamp(),
         );
