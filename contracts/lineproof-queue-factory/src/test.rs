@@ -37,7 +37,7 @@ fn test_deploy_queue_registers_and_indexes() {
     init(&env, &admin);
     let deployer = Address::new(&env, &[2u8; 7]);
     let slug = Symbol::new(&env, "test-q");
-    let wasm_hash = soroban_sdk::BytesN::new(&env, &[3u8; 32]);
+    let wasm_hash = soroban_sdk::BytesN::from_array(&env, &[3u8; 32]);
     QueueFactoryImpl::deploy_queue(
         env.clone(),
         deployer,
@@ -65,7 +65,7 @@ fn test_list_queues_returns_all_slugs() {
     let deployer = Address::new(&env, &[2u8; 7]);
     for i in 0u8..3 {
         let slug = Symbol::new(&env, &format!("q{}", i));
-        let wasm_hash = soroban_sdk::BytesN::new(&env, &[i + 10; 32]);
+        let wasm_hash = soroban_sdk::BytesN::from_array(&env, &[i + 10; 32]);
         QueueFactoryImpl::deploy_queue(
             env.clone(),
             deployer.clone(),
@@ -86,7 +86,7 @@ fn test_deactivate_and_reactivate() {
     init(&env, &admin);
     let deployer = Address::new(&env, &[2u8; 7]);
     let slug = Symbol::new(&env, "toggle");
-    let wasm_hash = soroban_sdk::BytesN::new(&env, &[7u8; 32]);
+    let wasm_hash = soroban_sdk::BytesN::from_array(&env, &[7u8; 32]);
     QueueFactoryImpl::deploy_queue(
         env.clone(),
         deployer,
@@ -116,7 +116,7 @@ fn test_deploy_rejects_bad_version() {
     let (env, admin) = setup();
     init(&env, &admin);
     let deployer = Address::new(&env, &[2u8; 7]);
-    let wasm_hash = soroban_sdk::BytesN::new(&env, &[3u8; 32]);
+    let wasm_hash = soroban_sdk::BytesN::from_array(&env, &[3u8; 32]);
     QueueFactoryImpl::deploy_queue(
         env,
         deployer,
@@ -140,7 +140,7 @@ fn test_deploy_rejects_duplicate_slug() {
         slug.clone(),
         Symbol::new(&env, "D"),
         1,
-        soroban_sdk::BytesN::new(&env, &[3u8; 32]),
+        soroban_sdk::BytesN::from_array(&env, &[3u8; 32]),
     );
     QueueFactoryImpl::deploy_queue(
         env,
@@ -148,7 +148,7 @@ fn test_deploy_rejects_duplicate_slug() {
         slug,
         Symbol::new(&env, "D"),
         1,
-        soroban_sdk::BytesN::new(&env, &[4u8; 32]),
+        soroban_sdk::BytesN::from_array(&env, &[4u8; 32]),
     );
 }
 
@@ -163,11 +163,11 @@ fn test_upgrade_rejects_downgrade() {
         env.clone(),
         admin.clone(),
         slug.clone(),
-        BytesN::new(&env, &[4u8; 32]),
+        Address::new(&env, &[4u8; 7]),
         2,
     );
 
-    QueueFactoryImpl::upgrade_queue(env.clone(), admin, slug, 1, BytesN::new(&env, &[5u8; 32]));
+    QueueFactoryImpl::upgrade_queue(env.clone(), admin, slug, 1, BytesN::from_array(&env, &[5u8; 32]));
 }
 
 #[test]
@@ -176,17 +176,17 @@ fn test_upgrade_rejects_unapproved_hash() {
     let (env, admin) = setup();
     init(&env, &admin);
     QueueFactoryImpl::set_config(env.clone(), admin.clone(), 1, 2);
-    QueueFactoryImpl::register_approved_hash(env.clone(), admin.clone(), 2, BytesN::new(&env, &[6u8; 32]));
+    QueueFactoryImpl::register_approved_hash(env.clone(), admin.clone(), 2, BytesN::from_array(&env, &[6u8; 32]));
     let slug = Symbol::new(&env, "secure");
     QueueFactoryImpl::register_queue(
         env.clone(),
         admin.clone(),
         slug.clone(),
-        BytesN::new(&env, &[4u8; 32]),
+        Address::new(&env, &[4u8; 7]),
         1,
     );
 
-    QueueFactoryImpl::upgrade_queue(env.clone(), admin, slug, 2, BytesN::new(&env, &[7u8; 32]));
+    QueueFactoryImpl::upgrade_queue(env.clone(), admin, slug, 2, BytesN::from_array(&env, &[7u8; 32]));
 }
 
 #[test]
@@ -194,7 +194,7 @@ fn test_upgrade_rejects_unapproved_hash() {
 fn test_deploy_rejects_unapproved_hash() {
     let (env, admin) = setup();
     init(&env, &admin);
-    QueueFactoryImpl::register_approved_hash(env.clone(), admin, 1, BytesN::new(&env, &[6u8; 32]));
+    QueueFactoryImpl::register_approved_hash(env.clone(), admin, 1, BytesN::from_array(&env, &[6u8; 32]));
 
     QueueFactoryImpl::deploy_queue(
         env.clone(),
@@ -202,7 +202,7 @@ fn test_deploy_rejects_unapproved_hash() {
         Symbol::new(&env, "secure"),
         Symbol::new(&env, "S"),
         1,
-        BytesN::new(&env, &[7u8; 32]),
+        BytesN::from_array(&env, &[7u8; 32]),
     );
 }
 
@@ -216,17 +216,17 @@ fn test_upgrade_rejects_unapproved_hash_v2() {
         env.clone(),
         admin.clone(),
         2,
-        soroban_sdk::BytesN::new(&env, &[7u8; 32]),
+        soroban_sdk::BytesN::from_array(&env, &[7u8; 32]),
     );
     let slug = Symbol::new(&env, "unapproved");
     QueueFactoryImpl::register_queue(
         env.clone(),
         admin.clone(),
         slug.clone(),
-        soroban_sdk::BytesN::new(&env, &[5u8; 32]),
+        Address::new(&env, &[5u8; 7]),
         1,
     );
-    QueueFactoryImpl::upgrade_queue(env.clone(), admin, slug, 2, soroban_sdk::BytesN::new(&env, &[8u8; 32]));
+    QueueFactoryImpl::upgrade_queue(env.clone(), admin, slug, 2, soroban_sdk::BytesN::from_array(&env, &[8u8; 32]));
 }
 
 #[test]
@@ -238,7 +238,7 @@ fn test_destroy_removes_queue_and_allows_slug_reuse() {
         env.clone(),
         admin.clone(),
         slug.clone(),
-        BytesN::new(&env, &[8u8; 32]),
+        Address::new(&env, &[8u8; 7]),
         1,
     );
 
@@ -250,7 +250,7 @@ fn test_destroy_removes_queue_and_allows_slug_reuse() {
         env.clone(),
         admin.clone(),
         slug.clone(),
-        BytesN::new(&env, &[9u8; 32]),
+        Address::new(&env, &[9u8; 7]),
         1,
     );
     assert_eq!(QueueFactoryImpl::list_queues(env.clone()).len(), 1);
@@ -259,7 +259,7 @@ fn test_destroy_removes_queue_and_allows_slug_reuse() {
         env.clone(),
         admin,
         slug.clone(),
-        soroban_sdk::BytesN::new(&env, &[6u8; 32]),
+        Address::new(&env, &[6u8; 7]),
         1,
     );
     assert!(QueueFactoryImpl::get_queue(env.clone(), slug).is_some());

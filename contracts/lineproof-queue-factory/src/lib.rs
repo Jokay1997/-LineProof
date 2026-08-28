@@ -22,7 +22,7 @@ pub struct QueueMetadata {
     pub slug: Symbol,
     pub name: Symbol,
     pub owner: Address,
-    pub contract_id: BytesN<32>,
+    pub contract_id: Address,
     pub version: u32,
     pub deployed_at: u64,
     pub active: bool,
@@ -45,8 +45,8 @@ pub trait QueueFactory {
         name: Symbol,
         version: u32,
         wasm_hash: BytesN<32>,
-    ) -> BytesN<32>;
-    fn register_queue(env: Env, admin: Address, slug: Symbol, contract_id: BytesN<32>, version: u32);
+    ) -> Address;
+    fn register_queue(env: Env, admin: Address, slug: Symbol, contract_id: Address, version: u32);
     fn register_approved_hash(env: Env, admin: Address, version: u32, wasm_hash: BytesN<32>);
     fn deactivate_queue(env: Env, admin: Address, slug: Symbol);
     fn reactivate_queue(env: Env, admin: Address, slug: Symbol);
@@ -93,7 +93,7 @@ impl QueueFactory for QueueFactoryImpl {
             &env,
             Symbol::new(&env, "Init"),
             Symbol::new(&env, ""),
-            BytesN::from_array(&env, &[0u8; 32]),
+            None,
             0,
             0,
         );
@@ -106,7 +106,7 @@ impl QueueFactory for QueueFactoryImpl {
         name: Symbol,
         version: u32,
         wasm_hash: BytesN<32>,
-    ) -> BytesN<32> {
+    ) -> Address {
         deployer.require_auth();
         let config_key = Symbol::new(&env, "config");
         let config: FactoryConfig = env.storage().persistent().get(&config_key).unwrap();
@@ -119,15 +119,14 @@ impl QueueFactory for QueueFactoryImpl {
         if env.storage().persistent().has(&registry_key) {
             panic!("queue with this slug already exists");
         }
-        let salt = BytesN::from_array(&env, &env.ledger().timestamp().to_be_bytes());
+        let salt = BytesN::from_array(&env, &[0u8; 32]);
         let contract_address = env.deployer().with_current_contract(salt).deploy(wasm_hash);
-        let contract_id: BytesN<32> = contract_address.into();
         let deployed_at = env.ledger().timestamp();
         let metadata = QueueMetadata {
             slug: slug.clone(),
             name,
             owner: deployer,
-            contract_id: contract_id.clone(),
+            contract_id: contract_address.clone(),
             version,
             deployed_at,
             active: true,
@@ -141,14 +140,14 @@ impl QueueFactory for QueueFactoryImpl {
             &env,
             Symbol::new(&env, "Deployed"),
             slug,
-            contract_id.clone(),
+            Some(&contract_address),
             version,
             deployed_at,
         );
-        contract_id
+        contract_address
     }
 
-    fn register_queue(env: Env, admin: Address, slug: Symbol, contract_id: BytesN<32>, version: u32) {
+    fn register_queue(env: Env, admin: Address, slug: Symbol, contract_id: Address, version: u32) {
         Self::require_admin(&env, &admin);
         let registry_key = Self::queue_registry_key(&env, &slug);
         if env.storage().persistent().has(&registry_key) {
@@ -173,7 +172,7 @@ impl QueueFactory for QueueFactoryImpl {
             &env,
             Symbol::new(&env, "Registered"),
             slug,
-            contract_id,
+            Some(&contract_id),
             version,
             deployed_at,
         );
@@ -196,7 +195,7 @@ impl QueueFactory for QueueFactoryImpl {
             &env,
             Symbol::new(&env, "HashApproved"),
             Symbol::new(&env, ""),
-            wasm_hash,
+            None,
             version,
             env.ledger().timestamp(),
         );
@@ -215,7 +214,7 @@ impl QueueFactory for QueueFactoryImpl {
             &env,
             Symbol::new(&env, "Deactivated"),
             slug,
-            metadata.contract_id,
+            Some(&metadata.contract_id),
             metadata.version,
             env.ledger().timestamp(),
         );
@@ -234,7 +233,7 @@ impl QueueFactory for QueueFactoryImpl {
             &env,
             Symbol::new(&env, "Reactivated"),
             slug,
-            metadata.contract_id,
+            Some(&metadata.contract_id),
             metadata.version,
             env.ledger().timestamp(),
         );
@@ -257,7 +256,7 @@ impl QueueFactory for QueueFactoryImpl {
             &env,
             Symbol::new(&env, "Destroyed"),
             slug,
-            BytesN::from_array(&env, &[0u8; 32]),
+            None,
             0,
             env.ledger().timestamp(),
         );
@@ -320,13 +319,12 @@ impl QueueFactory for QueueFactoryImpl {
             .extend_ttl(&registry_key, TTL_THRESHOLD, TTL_EXTEND_TO);
         // Upgrade the WASM code. The queue contract should call migrate() afterward
         // if storage transformations are needed for the new version.
-        let contract_address: Address = metadata.contract_id.clone().into();
         env.deployer().update_current_contract_wasm(new_wasm_hash);
         emit(
             &env,
             Symbol::new(&env, "Upgraded"),
             slug,
-            metadata.contract_id.clone(),
+            Some(&metadata.contract_id),
             new_version,
             env.ledger().timestamp(),
         );
@@ -433,11 +431,11 @@ impl QueueFactoryImpl {
     }
 }
 
-fn emit(env: &Env, kind: Symbol, slug: Symbol, contract_id: BytesN<32>, version: u32, _timestamp: u64) {
+fn emit(env: &Env, kind: Symbol, slug: Symbol, contract_id: Option<&Address>, version: u32, _timestamp: u64) {
     // #83: carry the deployed contract id and version in the event payload.
     env.events().publish(
         (Symbol::new(env, "lineproof_factory"), kind, slug),
-        (contract_id.clone(), version),
+        (contract_id.cloned(), version),
     );
 }
 
