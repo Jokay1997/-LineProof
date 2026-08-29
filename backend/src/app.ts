@@ -2,7 +2,6 @@ import "dotenv/config";
 import express, { type Express } from "express";
 import cors from "cors";
 import helmet from "helmet";
-import morgan from "morgan";
 import queueRoutes from "./routes/queues.js";
 import enrollmentRoutes from "./routes/enrollments.js";
 import escrowRoutes from "./routes/escrow.js";
@@ -48,12 +47,10 @@ export function createApp(): Express {
 
   app.use(checkContentLength(16384));
   app.use(express.json({ limit: "16kb" }));
-  // Morgan is a dev-only pretty-printer. requestLogger (below) is the sole
-  // source of structured JSON logs in every other environment — mounting
-  // both doubled log volume with two incompatible field sets (issue #30).
-  if (process.env.NODE_ENV === "development") {
-    app.use(morgan("dev"));
-  }
+  // requestLogger is the single logging source in every environment: JSON in
+  // production/test, a colored one-line summary in development. Morgan was
+  // removed (issue #202) — mounting it alongside requestLogger doubled log
+  // volume with two incompatible field sets.
   app.use(requestLogger);
 
   // /health is mounted before any rate limiter so uptime monitors and incident
