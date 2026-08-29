@@ -214,3 +214,46 @@ fn test_unbind_on_non_bound_queue_is_noop() {
     client.unbind(&user, &other_queue);
     assert!(client.is_bound(&user, &bound_queue));
 }
+
+#[test]
+#[should_panic(expected = "already_bound")]
+fn test_double_bind_panics() {
+    let (env, user, contract_id) = setup();
+    let client = IdentityImplClient::new(&env, &contract_id);
+    let queue_id = Symbol::new(&env, "duplicate_queue");
+    client.bind(&user, &queue_id);
+    client.bind(&user, &queue_id);
+}
+
+#[test]
+#[should_panic(expected = "max_queues_reached")]
+fn test_max_queues_reached_panics() {
+    let (env, user, contract_id) = setup();
+    let client = IdentityImplClient::new(&env, &contract_id);
+    for i in 0..100 {
+        let mut buf = [0u8; 5];
+        buf[0] = b'q';
+        buf[1] = b'_';
+        buf[2] = b'0' + ((i / 100) % 10) as u8;
+        buf[3] = b'0' + ((i / 10) % 10) as u8;
+        buf[4] = b'0' + (i % 10) as u8;
+        let s_str = core::str::from_utf8(&buf).unwrap();
+        let symbol = Symbol::new(&env, s_str);
+        client.bind(&user, &symbol);
+    }
+    let extra_symbol = Symbol::new(&env, "q_overflow");
+    client.bind(&user, &extra_symbol);
+}
+
+#[test]
+fn test_unbind_after_single_bind_leaves_empty_queues_vec() {
+    let (env, user, contract_id) = setup();
+    let client = IdentityImplClient::new(&env, &contract_id);
+    let queue_id = Symbol::new(&env, "single_queue");
+    client.bind(&user, &queue_id);
+    assert!(client.is_bound(&user, &queue_id));
+    client.unbind(&user, &queue_id);
+    assert!(!client.is_bound(&user, &queue_id));
+    let record = client.get_record(&user).unwrap();
+    assert_eq!(record.queues.len(), 0);
+}
