@@ -151,8 +151,19 @@ fn test_destroy_removes_queue_and_allows_slug_reuse() {
     assert_eq!(client.queue_count(), 1);
 }
 
+// issue #176: `require_auth()` alone only proves the transaction was signed
+// by whatever address is passed as `admin` — it does not prove that address
+// is the *stored* admin. `env.mock_all_auths()` (see `setup()`) makes every
+// `require_auth()` call succeed regardless of caller, which is exactly what
+// isolates that gap in these tests: a `not_admin` address sails through
+// `require_auth()` unmocked-signature-and-all, so if `require_admin` didn't
+// also compare against `FactoryConfig.admin`, these calls would succeed
+// instead of panicking. Asserting on `expected = "unauthorized"` (not a bare
+// `#[should_panic]`) pins the failure to that specific check, not to an
+// incidental panic (e.g. "not initialized") elsewhere in the call path.
+
 #[test]
-#[should_panic]
+#[should_panic(expected = "unauthorized")]
 fn test_set_config_non_admin_panics() {
     let (env, admin, contract_id) = setup();
     let client = init(&env, &admin, &contract_id);
@@ -161,7 +172,7 @@ fn test_set_config_non_admin_panics() {
 }
 
 #[test]
-#[should_panic]
+#[should_panic(expected = "unauthorized")]
 fn test_register_queue_non_admin_panics() {
     let (env, admin, contract_id) = setup();
     let client = init(&env, &admin, &contract_id);
@@ -171,7 +182,30 @@ fn test_register_queue_non_admin_panics() {
 }
 
 #[test]
-#[should_panic]
+#[should_panic(expected = "unauthorized")]
+fn test_deactivate_queue_non_admin_panics() {
+    let (env, admin, contract_id) = setup();
+    let client = init(&env, &admin, &contract_id);
+    let slug = Symbol::new(&env, "gatekept_deactivate");
+    client.register_queue(&admin, &slug, &Address::generate(&env), &1);
+    let not_admin = Address::generate(&env);
+    client.deactivate_queue(&not_admin, &slug);
+}
+
+#[test]
+#[should_panic(expected = "unauthorized")]
+fn test_reactivate_queue_non_admin_panics() {
+    let (env, admin, contract_id) = setup();
+    let client = init(&env, &admin, &contract_id);
+    let slug = Symbol::new(&env, "gatekept_reactivate");
+    client.register_queue(&admin, &slug, &Address::generate(&env), &1);
+    client.deactivate_queue(&admin, &slug);
+    let not_admin = Address::generate(&env);
+    client.reactivate_queue(&not_admin, &slug);
+}
+
+#[test]
+#[should_panic(expected = "unauthorized")]
 fn test_upgrade_queue_non_admin_panics() {
     let (env, admin, contract_id) = setup();
     let client = init(&env, &admin, &contract_id);
@@ -180,6 +214,30 @@ fn test_upgrade_queue_non_admin_panics() {
     client.register_queue(&admin, &slug, &Address::generate(&env), &1);
     let not_admin = Address::generate(&env);
     client.upgrade_queue(&not_admin, &slug, &2, &BytesN::from_array(&env, &[9u8; 32]));
+}
+
+// Not named in issue #176's acceptance criteria, but gated by the same
+// `require_admin` helper — covered for completeness since the vulnerability
+// (and the fix) is in the shared helper, not in any one caller.
+
+#[test]
+#[should_panic(expected = "unauthorized")]
+fn test_register_approved_hash_non_admin_panics() {
+    let (env, admin, contract_id) = setup();
+    let client = init(&env, &admin, &contract_id);
+    let not_admin = Address::generate(&env);
+    client.register_approved_hash(&not_admin, &1, &BytesN::from_array(&env, &[1u8; 32]));
+}
+
+#[test]
+#[should_panic(expected = "unauthorized")]
+fn test_destroy_queue_non_admin_panics() {
+    let (env, admin, contract_id) = setup();
+    let client = init(&env, &admin, &contract_id);
+    let slug = Symbol::new(&env, "gatekept_destroy");
+    client.register_queue(&admin, &slug, &Address::generate(&env), &1);
+    let not_admin = Address::generate(&env);
+    client.destroy_queue(&not_admin, &slug);
 }
 
 #[test]
