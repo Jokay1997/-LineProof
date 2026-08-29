@@ -1,10 +1,10 @@
 # API Reference — Escrow
 
-Base path: `/api/escrow`
+Base path: `/api/v1/escrow` *(Note: Legacy `/api/escrow` is deprecated and forwards to `/api/v1/escrow` with `Deprecation: true` header)*
 
 ---
 
-## POST /api/escrow/deposit
+## POST /api/v1/escrow/deposit
 
 Creates an escrow hold for a queue participant.
 

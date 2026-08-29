@@ -21,6 +21,8 @@ import { startWebhookDispatcher } from "./services/webhookDispatcher.js";
 import { checkContentLength } from "./middleware/contentLength.js";
 import { createCorsOptions } from "./middleware/corsConfig.js";
 
+import { deprecationMiddleware } from "./middleware/deprecation.js";
+
 export function createApp(): Express {
   startWebhookDispatcher();
   const app: Express = express();
@@ -60,14 +62,19 @@ export function createApp(): Express {
     res.json(healthPayload());
   });
 
-  // Per-route limiters replace the former global limiter so a burst on one
-  // route group cannot exhaust the quota of another (issue #108). Read feeds
-  // get a high threshold; each write group has its own independent counter.
-  app.use("/api/queues", readLimiter, queueRoutes);
-  app.use("/api/enrollments", enrollmentLimiter, enrollmentRoutes);
-  app.use("/api/escrow", escrowLimiter, escrowRoutes);
+  // Canonical Version 1 Routes (/api/v1/)
+  app.use("/api/v1/queues", readLimiter, queueRoutes);
+  app.use("/api/v1/enrollments", enrollmentLimiter, enrollmentRoutes);
+  app.use("/api/v1/escrow", escrowLimiter, escrowRoutes);
+  app.use("/api/v1/webhooks", webhookRoutes);
+
+  // Legacy Unversioned Routes (/api/) with Deprecation Warning Header
+  app.use("/api/queues", deprecationMiddleware, readLimiter, queueRoutes);
+  app.use("/api/enrollments", deprecationMiddleware, enrollmentLimiter, enrollmentRoutes);
+  app.use("/api/escrow", deprecationMiddleware, escrowLimiter, escrowRoutes);
+  app.use("/api/webhooks", deprecationMiddleware, webhookRoutes);
+
   app.use("/public", readLimiter, publicRoutes);
-  app.use("/api/webhooks", webhookRoutes);
 
   app.use(errorHandler);
 
