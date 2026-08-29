@@ -38,6 +38,8 @@ make deploy-localnet
 make docker-down
 ```
 
+> **Note on Backend Storage:** The local stack backend currently runs using an in-memory storage layer (ephemeral state wiped on restart). The PostgreSQL container service will be restored when full database persistence (issue #9) is implemented.
+
 Use `make docker-clean` when you need to reset local ledger state.
 
 ## Repository Map
