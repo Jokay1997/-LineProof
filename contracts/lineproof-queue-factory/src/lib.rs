@@ -20,7 +20,7 @@ pub struct QueueMetadata {
     pub slug: Symbol,
     pub name: Symbol,
     pub owner: Address,
-    pub contract_id: BytesN<32>,
+    pub contract_id: Address,
     pub version: u32,
     pub deployed_at: u64,
     pub active: bool,
@@ -43,8 +43,8 @@ pub trait QueueFactory {
         name: Symbol,
         version: u32,
         wasm_hash: BytesN<32>,
-    ) -> BytesN<32>;
-    fn register_queue(env: Env, admin: Address, slug: Symbol, contract_id: BytesN<32>, version: u32);
+    ) -> Address;
+    fn register_queue(env: Env, admin: Address, slug: Symbol, contract_id: Address, version: u32);
     fn register_approved_hash(env: Env, admin: Address, version: u32, wasm_hash: BytesN<32>);
     fn deactivate_queue(env: Env, admin: Address, slug: Symbol);
     fn reactivate_queue(env: Env, admin: Address, slug: Symbol);
@@ -84,14 +84,11 @@ impl QueueFactory for QueueFactoryImpl {
         env.storage()
             .persistent()
             .extend_ttl(&idx_key, TTL_THRESHOLD, TTL_EXTEND_TO);
-        env.storage()
-            .persistent()
-            .extend_ttl(&env.current_contract_address(), TTL_THRESHOLD, TTL_EXTEND_TO);
         emit(
             &env,
             Symbol::new(&env, "Init"),
             Symbol::new(&env, ""),
-            BytesN::new(&env, &[0u8; 32]),
+            env.current_contract_address(),
             0,
             0,
         );
@@ -104,7 +101,7 @@ impl QueueFactory for QueueFactoryImpl {
         name: Symbol,
         version: u32,
         wasm_hash: BytesN<32>,
-    ) -> BytesN<32> {
+    ) -> Address {
         deployer.require_auth();
         let config_key = Symbol::new(&env, "config");
         let config: FactoryConfig = env.storage().persistent().get(&config_key).unwrap();
@@ -117,7 +114,10 @@ impl QueueFactory for QueueFactoryImpl {
         if env.storage().persistent().has(&registry_key) {
             panic!("queue with this slug already exists");
         }
-        let contract_id = env.deployer().with_current_contract(&wasm_hash).deploy();
+        let contract_id = env
+            .deployer()
+            .with_current_contract(wasm_hash.clone())
+            .deploy(wasm_hash.clone());
         let deployed_at = env.ledger().timestamp();
         let metadata = QueueMetadata {
             slug: slug.clone(),
@@ -144,7 +144,7 @@ impl QueueFactory for QueueFactoryImpl {
         contract_id
     }
 
-    fn register_queue(env: Env, admin: Address, slug: Symbol, contract_id: BytesN<32>, version: u32) {
+    fn register_queue(env: Env, admin: Address, slug: Symbol, contract_id: Address, version: u32) {
         Self::require_admin(&env, &admin);
         let registry_key = Self::queue_registry_key(&env, &slug);
         if env.storage().persistent().has(&registry_key) {
@@ -153,7 +153,7 @@ impl QueueFactory for QueueFactoryImpl {
         let deployed_at = env.ledger().timestamp();
         let metadata = QueueMetadata {
             slug: slug.clone(),
-            name: Symbol::new(&env, "(imported)"),
+            name: Symbol::new(&env, "imported"),
             owner: admin.clone(),
             contract_id: contract_id.clone(),
             version,
@@ -173,6 +173,20 @@ impl QueueFactory for QueueFactoryImpl {
             version,
             deployed_at,
         );
+    }
+
+    fn register_approved_hash(env: Env, admin: Address, version: u32, wasm_hash: BytesN<32>) {
+        Self::require_admin(&env, &admin);
+        let key = Self::approved_hash_key(&env, version);
+        env.storage().persistent().set(&key, &wasm_hash);
+        env.storage()
+            .persistent()
+            .extend_ttl(&key, TTL_THRESHOLD, TTL_EXTEND_TO);
+        let enabled_key = Symbol::new(&env, APPROVED_REGISTRY_ENABLED_KEY);
+        env.storage().persistent().set(&enabled_key, &true);
+        env.storage()
+            .persistent()
+            .extend_ttl(&enabled_key, TTL_THRESHOLD, TTL_EXTEND_TO);
     }
 
     fn deactivate_queue(env: Env, admin: Address, slug: Symbol) {
@@ -230,8 +244,6 @@ impl QueueFactory for QueueFactoryImpl {
             &env,
             Symbol::new(&env, "Destroyed"),
             slug,
-            BytesN::new(&env, &[0u8; 32]),
-            0,
             metadata.contract_id,
             metadata.version,
             env.ledger().timestamp(),
@@ -294,11 +306,11 @@ impl QueueFactory for QueueFactoryImpl {
         env.storage()
             .persistent()
             .extend_ttl(&registry_key, TTL_THRESHOLD, TTL_EXTEND_TO);
-        // Upgrade the WASM code. The queue contract should call migrate() afterward
-        // if storage transformations are needed for the new version.
-        env.deployer()
-            .with_current_contract(&new_wasm_hash)
-            .upgrade(&contract_id);
+        // Note: Soroban has no cross-contract "force upgrade" call — a contract can
+        // only replace its own WASM via `update_current_contract_wasm` from inside
+        // its own execution. The factory can only advance the registry's version
+        // record here; the queue contract itself must expose an admin-gated
+        // self-upgrade entrypoint that it calls to pick up `new_wasm_hash`.
         emit(
             &env,
             Symbol::new(&env, "Upgraded"),
@@ -399,18 +411,13 @@ impl QueueFactoryImpl {
             }
         }
         env.storage().persistent().set(&idx_key, &remaining);
-        let mut slugs: Vec<Symbol> = env.storage().persistent().get(&idx_key).unwrap_or(Vec::new(env));
-        if let Some(index) = slugs.first_index_of(slug.clone()) {
-            let _ = slugs.remove(index);
-        }
-        env.storage().persistent().set(&idx_key, &slugs);
         env.storage()
             .persistent()
             .extend_ttl(&idx_key, TTL_THRESHOLD, TTL_EXTEND_TO);
     }
 }
 
-fn emit(env: &Env, kind: Symbol, slug: Symbol, contract_id: BytesN<32>, version: u32, _timestamp: u64) {
+fn emit(env: &Env, kind: Symbol, slug: Symbol, contract_id: Address, version: u32, _timestamp: u64) {
     // #83: carry the deployed contract id and version in the event payload.
     env.events().publish(
         (Symbol::new(env, "lineproof_factory"), kind, slug),
