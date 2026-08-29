@@ -32,7 +32,7 @@
       "prettier --write"
     ],
     "*.rs": [
-      "cargo fmt --"
+      "cargo fmt --manifest-path contracts/Cargo.toml --all --"
     ],
     "*.{json,md,yml,yaml}": [
       "prettier --write"

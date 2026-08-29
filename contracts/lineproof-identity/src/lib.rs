@@ -4,6 +4,8 @@ use soroban_sdk::{contract, contractimpl, contracttype, Address, Env, Symbol, Ve
 const TTL_THRESHOLD: u32 = 10_000;
 /// TTL extension target: extend to this many ledgers (~1 year at 5s/ledger)
 const TTL_EXTEND_TO: u32 = 6_307_200;
+/// Maximum number of queue bindings allowed per identity record to prevent storage bloat
+pub const MAX_QUEUES_PER_IDENTITY: u32 = 100;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 #[contracttype]
@@ -55,6 +57,12 @@ impl Identity for IdentityImpl {
         if matches!(record.status, BindingStatus::Revoked) {
             panic!("identity revoked");
         }
+        if record.queues.iter().any(|q| q == queue_id) {
+            panic!("already_bound");
+        }
+        if record.queues.len() >= MAX_QUEUES_PER_IDENTITY {
+            panic!("max_queues_reached");
+        }
         record.queues.push_back(queue_id.clone());
         if record.bound_at == 0 {
             record.bound_at = env.ledger().timestamp();
@@ -77,6 +85,10 @@ impl Identity for IdentityImpl {
     fn unbind(env: Env, identity: Address, queue_id: Symbol) {
         identity.require_auth();
         let mut record = Self::get_record_internal(&env, &identity);
+        let is_bound = record.queues.iter().any(|q| q == queue_id);
+        if !is_bound {
+            return;
+        }
         let mut updated: Vec<Symbol> = Vec::new(&env);
         for q in record.queues.iter() {
             if q != queue_id {
