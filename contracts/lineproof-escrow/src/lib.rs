@@ -115,6 +115,7 @@ impl Escrow for EscrowImpl {
         env.storage()
             .persistent()
             .extend_ttl(&key, TTL_THRESHOLD, TTL_EXTEND_TO);
+        Self::decrement_total(&env, &queue_id, record.amount);
         emit(&env, Symbol::new(&env, "Released"), queue_id, &identity, record.amount);
     }
 
@@ -131,6 +132,7 @@ impl Escrow for EscrowImpl {
         env.storage()
             .persistent()
             .extend_ttl(&key, TTL_THRESHOLD, TTL_EXTEND_TO);
+        Self::decrement_total(&env, &queue_id, record.amount);
         emit(&env, Symbol::new(&env, "Refunded"), queue_id, &identity, record.amount);
     }
 
@@ -149,6 +151,7 @@ impl Escrow for EscrowImpl {
         env.storage()
             .persistent()
             .extend_ttl(&key, TTL_THRESHOLD, TTL_EXTEND_TO);
+        Self::decrement_total(&env, &queue_id, record.amount);
         emit(&env, Symbol::new(&env, "Expired"), queue_id, &identity, record.amount);
     }
 
@@ -211,6 +214,15 @@ impl EscrowImpl {
 
     fn total_key(env: &Env, queue_id: &Symbol) -> (Symbol, Symbol) {
         (Symbol::new(env, "escrow_total"), queue_id.clone())
+    }
+
+    fn decrement_total(env: &Env, queue_id: &Symbol, amount: i128) {
+        let total_key = Self::total_key(env, queue_id);
+        let current: i128 = env.storage().persistent().get(&total_key).unwrap_or(0);
+        env.storage().persistent().set(&total_key, &(current - amount));
+        env.storage()
+            .persistent()
+            .extend_ttl(&total_key, TTL_THRESHOLD, TTL_EXTEND_TO);
     }
 }
 
