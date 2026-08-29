@@ -24,6 +24,7 @@ fn test_enroll_creates_record() {
     let record = client.enrollment_record(&caller, &queue_id).unwrap();
     assert_eq!(record.identity, caller);
     assert!(!record.finalized);
+    assert!(!record.cancelled);
     assert_eq!(record.duplicate_count, 0);
 }
 
@@ -44,13 +45,6 @@ fn test_is_enrolled_returns_correct_state() {
     let contract_id = env.register(EnrollmentImpl, ());
     let client = EnrollmentImplClient::new(&env, &contract_id);
     let queue_id = Symbol::new(&env, "visa");
-    assert!(!EnrollmentImpl::is_enrolled(
-        env.clone(),
-        caller.clone(),
-        queue_id.clone()
-    ));
-    EnrollmentImpl::enroll(env.clone(), caller.clone(), queue_id.clone());
-    assert!(EnrollmentImpl::is_enrolled(env, caller, queue_id));
     assert!(!client.is_enrolled(&caller, &queue_id));
     client.enroll(&caller, &queue_id, &None);
     assert!(client.is_enrolled(&caller, &queue_id));
@@ -63,8 +57,52 @@ fn test_cancel_removes_enrollment() {
     let client = EnrollmentImplClient::new(&env, &contract_id);
     let queue_id = Symbol::new(&env, "health");
     client.enroll(&caller, &queue_id, &None);
+    assert_eq!(client.enrollment_count(&queue_id), 1);
+
     client.cancel(&caller, &queue_id);
     assert!(!client.is_enrolled(&caller, &queue_id));
+    assert_eq!(client.enrollment_count(&queue_id), 0);
+
+    // Record is preserved for audit trail with cancelled: true
+    let record = client.enrollment_record(&caller, &queue_id).unwrap();
+    assert!(record.cancelled);
+}
+
+#[test]
+fn test_re_enroll_after_cancel_increments_duplicate_count() {
+    let (env, caller) = setup();
+    let contract_id = env.register(EnrollmentImpl, ());
+    let client = EnrollmentImplClient::new(&env, &contract_id);
+    let queue_id = Symbol::new(&env, "event_pass");
+
+    // First enrollment
+    let proof1 = client.enroll(&caller, &queue_id, &None);
+    let rec1 = client.enrollment_record(&caller, &queue_id).unwrap();
+    assert_eq!(rec1.duplicate_count, 0);
+    assert!(!rec1.cancelled);
+    assert!(client.is_enrolled(&caller, &queue_id));
+    assert_eq!(client.enrollment_count(&queue_id), 1);
+
+    // Cancel enrollment
+    client.cancel(&caller, &queue_id);
+    let rec_cancelled = client.enrollment_record(&caller, &queue_id).unwrap();
+    assert!(rec_cancelled.cancelled);
+    assert!(!client.is_enrolled(&caller, &queue_id));
+    assert_eq!(client.enrollment_count(&queue_id), 0);
+
+    // Advance timestamp
+    env.ledger().set_timestamp(200);
+
+    // Re-enroll
+    let proof2 = client.enroll(&caller, &queue_id, &None);
+    let rec2 = client.enrollment_record(&caller, &queue_id).unwrap();
+
+    assert_eq!(rec2.duplicate_count, 1);
+    assert!(!rec2.cancelled);
+    assert!(client.is_enrolled(&caller, &queue_id));
+    assert_eq!(client.enrollment_count(&queue_id), 1);
+    assert_eq!(rec2.enrolled_at, 200);
+    assert_ne!(proof1.proof_hash, proof2.proof_hash);
 }
 
 #[test]
@@ -75,6 +113,31 @@ fn test_cancel_panics_when_not_enrolled() {
     let client = EnrollmentImplClient::new(&env, &contract_id);
     let queue_id = Symbol::new(&env, "absent");
     client.cancel(&caller, &queue_id);
+}
+
+#[test]
+#[should_panic(expected = "not enrolled")]
+fn test_cancel_panics_when_already_cancelled() {
+    let (env, caller) = setup();
+    let contract_id = env.register(EnrollmentImpl, ());
+    let client = EnrollmentImplClient::new(&env, &contract_id);
+    let queue_id = Symbol::new(&env, "double_cancel");
+    client.enroll(&caller, &queue_id, &None);
+    client.cancel(&caller, &queue_id);
+    client.cancel(&caller, &queue_id);
+}
+
+#[test]
+#[should_panic(expected = "not enrolled")]
+fn test_finalize_cancelled_panics() {
+    let (env, admin) = setup();
+    let contract_id = env.register(EnrollmentImpl, ());
+    let client = EnrollmentImplClient::new(&env, &contract_id);
+    let user = Address::generate(&env);
+    let queue_id = Symbol::new(&env, "fin_cancel");
+    client.enroll(&user, &queue_id, &None);
+    client.cancel(&user, &queue_id);
+    client.finalize_enrollment(&admin, &user, &queue_id);
 }
 
 #[test]
@@ -102,11 +165,6 @@ fn test_set_duplicate_behavior() {
 #[test]
 fn test_finalize_enrollment() {
     let (env, admin) = setup();
-    let user = Address::generate(&env);
-    let queue_id = Symbol::new(&env, "fin-q");
-    EnrollmentImpl::enroll(env.clone(), user.clone(), queue_id.clone());
-    EnrollmentImpl::finalize_enrollment(env.clone(), admin.clone(), user.clone(), queue_id.clone());
-    let record = EnrollmentImpl::enrollment_record(env, user, queue_id).unwrap();
     let contract_id = env.register(EnrollmentImpl, ());
     let client = EnrollmentImplClient::new(&env, &contract_id);
     let user = Address::generate(&env);
@@ -143,11 +201,6 @@ fn test_enrollment_record_returns_none_when_missing() {
 #[test]
 fn test_proof_hash_is_distinct_for_different_inputs() {
     let (env, _) = setup();
-    let u1 = Address::generate(&env);
-    let u2 = Address::generate(&env);
-    let queue_id = Symbol::new(&env, "q-hash");
-    let proof1 = EnrollmentImpl::enroll(env.clone(), u1.clone(), queue_id.clone());
-    let proof2 = EnrollmentImpl::enroll(env.clone(), u2.clone(), queue_id.clone());
     let contract_id = env.register(EnrollmentImpl, ());
     let client = EnrollmentImplClient::new(&env, &contract_id);
     let u1 = Address::generate(&env);
@@ -173,10 +226,6 @@ fn test_cancel_emits_original_hash() {
 
     let topics = cancel_event.1;
     // topic[0] is lineproof_enrollment, topic[1] is Cancelled, topic[2] is queue_id
-    assert_eq!(
-        topics.get(1).unwrap(),
-        soroban_sdk::IntoVal::into_val(&Symbol::new(&env, "Cancelled"), &env)
-    );
     assert_eq!(
         Symbol::try_from_val(&env, &topics.get(1).unwrap()).unwrap(),
         Symbol::new(&env, "Cancelled")
