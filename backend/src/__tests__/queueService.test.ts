@@ -55,6 +55,27 @@ describe('advanceQueue', () => {
     closeQueue(q.id);
     expect(() => advanceQueue(q.id, 1)).toThrow(/Invalid status transition/);
   });
+
+  it('throws on advancing a Draft queue (lifecycle check)', () => {
+    const q = createQueue({ name: 'DQ', slug: 'draft-q', maxPositions: 10 });
+    expect(() => advanceQueue(q.id, 1)).toThrow(/Invalid status transition/);
+  });
+
+  it('throws on advancing an EnrollmentOpen queue (lifecycle check)', () => {
+    const q = createQueue({ name: 'EOQ', slug: 'enrollment-open-q', maxPositions: 10 });
+    openEnrollment(q.id);
+    expect(() => advanceQueue(q.id, 1)).toThrow(/Invalid status transition/);
+  });
+
+  it('allows advancing an EnrollmentClosed queue', () => {
+    const q = createQueue({ name: 'ECQ', slug: 'enrollment-closed-q', maxPositions: 10 });
+    openEnrollment(q.id);
+    closeEnrollment(q.id);
+    (q as any).enrolled = 5;
+    const updated = advanceQueue(q.id, 3);
+    expect(updated?.status).toBe(QueueStatus.AdvancementActive);
+    expect(updated?.advanced).toBe(3);
+  });
 });
 
 describe('getQueueStats', () => {
