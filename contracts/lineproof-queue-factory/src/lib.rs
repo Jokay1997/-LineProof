@@ -323,6 +323,15 @@ impl QueueFactory for QueueFactoryImpl {
 }
 
 impl QueueFactoryImpl {
+    /// Gates every admin-only entrypoint (issue #176). `require_auth()` alone
+    /// only proves the transaction was signed by `admin` — it says nothing
+    /// about *whose* address `admin` is. Any caller can pass their own
+    /// address as the `admin` argument and sign for it, so without this
+    /// stored-admin comparison `require_auth()` verifies a self-signed claim,
+    /// not membership in the factory's admin role. Mirrors the pattern
+    /// already used by `lineproof-identity`'s `revoke()` /
+    /// `set_transfer_allowed()`, including the `"unauthorized"` panic
+    /// message, for a consistent authorization contract across both crates.
     fn require_admin(env: &Env, admin: &Address) {
         admin.require_auth();
         let config_key = Symbol::new(env, "config");
@@ -332,7 +341,7 @@ impl QueueFactoryImpl {
             .get(&config_key)
             .unwrap_or_else(|| panic!("not initialized"));
         if config.admin != *admin {
-            panic!("not authorized");
+            panic!("unauthorized");
         }
     }
 
