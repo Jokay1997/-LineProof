@@ -79,7 +79,7 @@ impl Identity for IdentityImpl {
         let mut record = Self::get_record_internal(&env, &identity);
         let mut updated: Vec<Symbol> = Vec::new(&env);
         for q in record.queues.iter() {
-            if q != &queue_id {
+            if q != queue_id {
                 updated.push_back(q.clone());
             }
         }
@@ -100,7 +100,7 @@ impl Identity for IdentityImpl {
 
     fn is_bound(env: Env, identity: Address, queue_id: Symbol) -> bool {
         let record = Self::get_record_internal(&env, &identity);
-        record.queues.iter().any(|q| q == &queue_id)
+        record.queues.iter().any(|q| q == queue_id)
     }
 
     fn can_transfer(env: Env, from: Address, to: Address, queue_id: Symbol) -> bool {
@@ -113,7 +113,7 @@ impl Identity for IdentityImpl {
             return false;
         }
 
-        let is_bound = record.queues.iter().any(|q| q == &queue_id);
+        let is_bound = record.queues.iter().any(|q| q == queue_id);
         if !is_bound {
             return false;
         }
@@ -175,9 +175,6 @@ impl Identity for IdentityImpl {
         env.storage()
             .persistent()
             .extend_ttl(&key, TTL_THRESHOLD, TTL_EXTEND_TO);
-        env.storage()
-            .persistent()
-            .extend_ttl(&env.current_contract_address(), TTL_THRESHOLD, TTL_EXTEND_TO);
     }
 
     fn get_admin(env: Env) -> Option<Address> {
@@ -216,16 +213,20 @@ impl Identity for IdentityImpl {
 impl IdentityImpl {
     fn get_record_internal(env: &Env, identity: &Address) -> IdentityRecord {
         let key = Self::record_key(env, identity);
-        let record = env.storage().persistent().get(&key).unwrap_or(IdentityRecord {
-            identity: identity.clone(),
-            bound_at: 0,
-            queues: Vec::new(env),
-            status: BindingStatus::Unbound,
-        });
-        env.storage()
-            .persistent()
-            .extend_ttl(&key, TTL_THRESHOLD, TTL_EXTEND_TO);
-        record
+        if env.storage().persistent().has(&key) {
+            let record = env.storage().persistent().get(&key).unwrap();
+            env.storage()
+                .persistent()
+                .extend_ttl(&key, TTL_THRESHOLD, TTL_EXTEND_TO);
+            record
+        } else {
+            IdentityRecord {
+                identity: identity.clone(),
+                bound_at: 0,
+                queues: Vec::new(env),
+                status: BindingStatus::Unbound,
+            }
+        }
     }
 
     pub fn record_key(env: &Env, identity: &Address) -> (Symbol, Address) {
