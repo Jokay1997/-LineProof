@@ -33,6 +33,7 @@ pub struct EnrollmentRecord {
     pub duplicate_count: u32,
     pub finalized: bool,
     pub expires_at: Option<u64>,
+    pub cancelled: bool,
 }
 
 pub trait Enrollment {
@@ -118,6 +119,7 @@ impl Enrollment for EnrollmentImpl {
                         duplicate_count: record.duplicate_count + 1,
                         finalized: false,
                         expires_at,
+                        cancelled: false,
                     };
                     env.storage().persistent().set(&record_key, &updated_record);
                     env.storage()
@@ -142,6 +144,14 @@ impl Enrollment for EnrollmentImpl {
             }
         }
 
+        let record_key = Self::record_key(&env, &caller, &queue_id);
+        let duplicate_count = if env.storage().persistent().has(&record_key) {
+            let existing_record = Self::load_record(&env, &caller, &queue_id);
+            existing_record.duplicate_count + 1
+        } else {
+            0
+        };
+
         let enrolled_at = env.ledger().timestamp();
         let hash = Self::compute_proof_hash(&env, &caller, &queue_id, enrolled_at);
         let record = EnrollmentRecord {
@@ -149,18 +159,15 @@ impl Enrollment for EnrollmentImpl {
             queue_id: queue_id.clone(),
             enrolled_at,
             proof_hash: hash.clone(),
-            duplicate_count: 0,
+            duplicate_count,
             finalized: false,
             expires_at,
+            cancelled: false,
         };
-        let key = Self::record_key(&env, &caller, &queue_id);
-        env.storage().persistent().set(&key, &record);
+        env.storage().persistent().set(&record_key, &record);
         env.storage()
             .persistent()
-            .extend_ttl(&key, TTL_THRESHOLD, TTL_EXTEND_TO);
-        env.storage()
-            .persistent()
-            .extend_ttl(&key, TTL_THRESHOLD, TTL_EXTEND_TO);
+            .extend_ttl(&record_key, TTL_THRESHOLD, TTL_EXTEND_TO);
 
         // Increment enrollment count
         let count_key = Self::count_key(&env, &queue_id);
@@ -190,12 +197,19 @@ impl Enrollment for EnrollmentImpl {
     fn cancel(env: Env, caller: Address, queue_id: Symbol) {
         caller.require_auth();
         let key = Self::record_key(&env, &caller, &queue_id);
-        let record: EnrollmentRecord = env
+        let mut record: EnrollmentRecord = env
             .storage()
             .persistent()
             .get(&key)
             .unwrap_or_else(|| panic!("not enrolled"));
-        env.storage().persistent().remove(&key);
+        if record.cancelled {
+            panic!("not enrolled");
+        }
+        record.cancelled = true;
+        env.storage().persistent().set(&key, &record);
+        env.storage()
+            .persistent()
+            .extend_ttl(&key, TTL_THRESHOLD, TTL_EXTEND_TO);
 
         // Decrement enrollment count
         let count_key = Self::count_key(&env, &queue_id);
@@ -257,6 +271,9 @@ impl Enrollment for EnrollmentImpl {
     fn finalize_enrollment(env: Env, admin: Address, identity: Address, queue_id: Symbol) {
         admin.require_auth();
         let mut record = Self::load_record(&env, &identity, &queue_id);
+        if record.cancelled {
+            panic!("not enrolled");
+        }
         if record.finalized {
             panic!("already finalized");
         }
@@ -318,6 +335,7 @@ impl Enrollment for EnrollmentImpl {
                 duplicate_count: 0,
                 finalized: false,
                 expires_at: None,
+                cancelled: false,
             };
             let record_key = Self::record_key(&env, &identity, &queue_id);
             env.storage().persistent().set(&record_key, &record);
@@ -353,7 +371,11 @@ impl Enrollment for EnrollmentImpl {
 impl EnrollmentImpl {
     fn is_enrolled_internal(env: &Env, identity: &Address, queue_id: &Symbol) -> bool {
         let key = Self::record_key(env, identity, queue_id);
-        env.storage().persistent().has(&key)
+        if let Some(record) = env.storage().persistent().get::<_, EnrollmentRecord>(&key) {
+            !record.cancelled
+        } else {
+            false
+        }
     }
 
     fn load_record(env: &Env, identity: &Address, queue_id: &Symbol) -> EnrollmentRecord {
