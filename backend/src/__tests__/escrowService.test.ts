@@ -81,3 +81,14 @@ describe('getEscrow', () => {
     expect(getEscrow('q-i1:heidi1')?.amount).toBe(amount);
   });
 });
+
+describe('createEscrowService isolation', () => {
+  it('allows the same escrow key in separate stores', () => {
+    const first = createEscrowService(new MemoryAdapter());
+    const second = createEscrowService(new MemoryAdapter());
+    const payload = { queueId: 'shared-queue', identity: 'shared-user', amount: 1n, asset: 'XLM' };
+
+    expect(first.depositEscrow(payload).status).toBe('Active');
+    expect(second.depositEscrow(payload).status).toBe('Active');
+  });
+});

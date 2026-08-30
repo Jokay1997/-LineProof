@@ -47,6 +47,8 @@ export class LineProofClient {
   readonly jitterFactor: number;
 
   private factoryContractId?: string;
+  private readonly sequenceCache = new Map<string, string>();
+  private readonly sequenceFetches = new Map<string, Promise<string>>();
 
   constructor(config: LineProofConfig) {
     const resolved = { ...DEFAULT_LINEPROOF_CONFIG, ...config };
@@ -123,7 +125,8 @@ export class LineProofClient {
       wasm: wasmBuffer,
     });
 
-    await this.submitSorobanOperation(op);
+    const txHash = await this.submitSorobanOperation(op);
+    await this.awaitTransaction(txHash);
     return wasmHash;
   }
 
@@ -147,19 +150,16 @@ export class LineProofClient {
     });
 
     const txHash = await this.submitSorobanOperation(op);
+    const returnVal = await this.awaitTransaction(txHash);
     let contractId: string;
     try {
-      const returnVal = await this.awaitTransaction(txHash);
-      if (returnVal) {
-        contractId = Address.fromScVal(returnVal).toString();
-      } else {
-        throw new Error("No return value");
-      }
-    } catch {
-      const scAddr = xdr.ScAddress.scAddressTypeContract(
-        hashBuffer.slice(0, 32),
+      contractId = Address.fromScVal(returnVal).toString();
+    } catch (error) {
+      throw new SDKError(
+        "INVALID_RESPONSE",
+        "createCustomContract did not return a contract address",
+        { cause: error instanceof Error ? error.message : String(error) },
       );
-      contractId = Address.fromScAddress(scAddr).toString();
     }
 
     validateContractId(contractId);
@@ -168,13 +168,14 @@ export class LineProofClient {
   }
 
   async deployFactory(wasmBytes?: Uint8Array): Promise<string> {
-    const keypair = this.requireKeypair();
-    await this.server.loadAccount(keypair.publicKey());
-
-    const bytesToDeploy =
-      wasmBytes ??
-      new Uint8Array([0x00, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00]);
-    const wasmHash = await this.uploadWasm(bytesToDeploy);
+    this.requireKeypair();
+    if (!wasmBytes || wasmBytes.length === 0) {
+      throw new SDKError(
+        "INVALID_INPUT",
+        "factory WASM bytes are required for deployment",
+      );
+    }
+    const wasmHash = await this.uploadWasm(wasmBytes);
     const contractId = await this.installContract(wasmHash);
     validateContractId(contractId);
     this.factoryContractId = contractId;
@@ -196,8 +197,44 @@ export class LineProofClient {
   }
 
   async refreshAccountSequence(): Promise<void> {
-    this.requireKeypair();
-    await this.sorobanServer.getAccount(this.requireKeypair().publicKey());
+    const publicKey = this.requireKeypair().publicKey();
+    await this.fetchAccountSequence(publicKey, true);
+  }
+
+  private async fetchAccountSequence(
+    publicKey: string,
+    force = false,
+  ): Promise<string> {
+    if (force) {
+      this.sequenceCache.delete(publicKey);
+      this.sequenceFetches.delete(publicKey);
+    }
+
+    const cached = this.sequenceCache.get(publicKey);
+    if (cached !== undefined) return cached;
+
+    let pending = this.sequenceFetches.get(publicKey);
+    if (!pending) {
+      pending = this.sorobanServer
+        .getAccount(publicKey)
+        .then((account) => {
+          const sequence = account.sequenceNumber();
+          this.sequenceCache.set(publicKey, sequence);
+          return sequence;
+        })
+        .finally(() => {
+          this.sequenceFetches.delete(publicKey);
+        });
+      this.sequenceFetches.set(publicKey, pending);
+    }
+    return pending;
+  }
+
+  private async reserveSourceAccount(publicKey: string): Promise<Account> {
+    await this.fetchAccountSequence(publicKey);
+    const sequence = this.sequenceCache.get(publicKey)!;
+    this.sequenceCache.set(publicKey, (BigInt(sequence) + 1n).toString());
+    return new Account(publicKey, sequence);
   }
 
   async submitSorobanOperation(
@@ -205,9 +242,10 @@ export class LineProofClient {
     onRetry?: OnRetryFn,
   ): Promise<string> {
     const keypair = this.requireKeypair();
+    const publicKey = keypair.publicKey();
 
     const submitFn = async (signal: AbortSignal): Promise<string> => {
-      const source = await this.sorobanServer.getAccount(keypair.publicKey());
+      const source = await this.reserveSourceAccount(publicKey);
       const transaction = new TransactionBuilder(source, {
         fee: BASE_FEE,
         networkPassphrase: this.networkPassphrase,
@@ -225,16 +263,21 @@ export class LineProofClient {
 
       const result = await this.sorobanServer.sendTransaction(prepared);
       if (result.status === "ERROR") {
+        const resultCode = result.errorResult
+          ?.result()
+          .switch()
+          .name.replace(/[A-Z]/g, (letter) => `_${letter.toLowerCase()}`);
         throw new SDKError(
           "TRANSACTION_FAILED",
-          "Soroban RPC rejected the transaction",
+          `Soroban RPC rejected the transaction${resultCode ? `: ${resultCode}` : ""}`,
+          resultCode ? { resultCode } : undefined,
         );
       }
       return result.hash;
     };
 
     const sequenceRefetch = async () => {
-      await this.sorobanServer.getAccount(keypair.publicKey());
+      await this.fetchAccountSequence(publicKey, true);
     };
 
     const retryResult = await withRetry(
