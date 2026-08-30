@@ -605,6 +605,106 @@ fn test_advance_from_advancement_active_state() {
 }
 
 #[test]
+fn test_active_enrolled_reflects_cancellations() {
+    let (env, admin, contract_id) = setup();
+    let config = make_config(&env, &admin);
+    let client = QueueImplClient::new(&env, &contract_id);
+    client.initialize(&admin, &config);
+    client.open_enrollment(&admin);
+
+    assert_eq!(client.active_enrolled(), 0);
+
+    let u1 = Address::generate(&env);
+    let u2 = Address::generate(&env);
+    let p1 = client.enroll_position(&u1);
+    let _p2 = client.enroll_position(&u2);
+    assert_eq!(client.active_enrolled(), 2);
+    // total_enrolled (ever-enrolled) also reads 2 here.
+    assert_eq!(client.total_enrolled(), 2);
+
+    client.cancel_position(&u1, &p1);
+
+    // Active count drops, but the ever-enrolled audit figure does not.
+    assert_eq!(client.active_enrolled(), 1);
+    assert_eq!(client.total_enrolled(), 2);
+}
+
+#[test]
+fn test_all_cancelled_queue_accepts_new_enrollments() {
+    let (env, admin, contract_id) = setup();
+    let mut config = make_config(&env, &admin);
+    config.max_positions = 2;
+    let client = QueueImplClient::new(&env, &contract_id);
+    client.initialize(&admin, &config);
+    client.open_enrollment(&admin);
+
+    let u1 = Address::generate(&env);
+    let u2 = Address::generate(&env);
+    let p1 = client.enroll_position(&u1);
+    let p2 = client.enroll_position(&u2);
+
+    // Queue is now "full" per active count.
+    assert_eq!(client.active_enrolled(), 2);
+
+    client.cancel_position(&u1, &p1);
+    client.cancel_position(&u2, &p2);
+
+    // All positions cancelled — active count back to zero, capacity freed.
+    assert_eq!(client.active_enrolled(), 0);
+
+    // A previously "full" queue (by the old next_id-based check) must now
+    // accept new enrollments since it has zero active participants.
+    let u3 = Address::generate(&env);
+    let new_pos = client.enroll_position(&u3);
+    assert_eq!(client.active_enrolled(), 1);
+    // ever-enrolled keeps growing across all three enrollments
+    assert_eq!(client.total_enrolled(), 3);
+    // new position gets a fresh id beyond max_positions since ids are
+    // never reused
+    assert_eq!(new_pos, 3);
+}
+
+#[test]
+#[should_panic(expected = "queue is full")]
+fn test_enroll_position_rejects_when_active_count_at_capacity() {
+    let (env, admin, contract_id) = setup();
+    let mut config = make_config(&env, &admin);
+    config.max_positions = 1;
+    let client = QueueImplClient::new(&env, &contract_id);
+    client.initialize(&admin, &config);
+    client.open_enrollment(&admin);
+
+    let u1 = Address::generate(&env);
+    let u2 = Address::generate(&env);
+    client.enroll_position(&u1);
+    // Second enrollment should be rejected — capacity is 1 and it's occupied.
+    client.enroll_position(&u2);
+}
+
+#[test]
+fn test_advance_reaches_positions_beyond_max_positions_after_cancellation() {
+    let (env, admin, contract_id) = setup();
+    let mut config = make_config(&env, &admin);
+    config.max_positions = 1;
+    let client = QueueImplClient::new(&env, &contract_id);
+    client.initialize(&admin, &config);
+    client.open_enrollment(&admin);
+
+    let u1 = Address::generate(&env);
+    let u2 = Address::generate(&env);
+    let p1 = client.enroll_position(&u1); // id=1
+    client.cancel_position(&u1, &p1);
+    let p2 = client.enroll_position(&u2); // id=2, beyond max_positions=1
+
+    client.close_enrollment(&admin);
+    let advanced = client.advance(&admin, &5);
+    // The second (active) position should still be reachable by advance()
+    // even though its id (2) exceeds max_positions (1).
+    assert_eq!(advanced.len(), 1);
+    assert!(advanced.iter().any(|id| id == p2));
+}
+
+#[test]
 fn test_advance_all_cancelled_does_not_transition_to_advancement_active() {
     let (env, admin, contract_id) = setup();
     let config = make_config(&env, &admin);

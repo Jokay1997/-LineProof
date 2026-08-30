@@ -74,6 +74,7 @@ pub trait Queue {
     fn get_config(env: Env) -> QueueConfig;
     fn current_position_index(env: Env) -> u32;
     fn total_enrolled(env: Env) -> u32;
+    fn active_enrolled(env: Env) -> u32;
     fn expire_position(env: Env, admin: Address, position_id: u32);
     fn expire_positions_batch(env: Env, admin: Address, position_ids: Vec<u32>);
     fn close(env: Env, admin: Address);
@@ -100,6 +101,11 @@ impl QueueImpl {
         env.storage()
             .persistent()
             .extend_ttl(&Symbol::new(&env, "next_id"), TTL_THRESHOLD, TTL_EXTEND_TO);
+        let key_active = Symbol::new(&env, "active_count");
+        env.storage().persistent().set(&key_active, &0u32);
+        env.storage()
+            .persistent()
+            .extend_ttl(&key_active, TTL_THRESHOLD, TTL_EXTEND_TO);
         let key_idx = Symbol::new(&env, "idx");
         env.storage().persistent().set(&key_idx, &0u32);
         env.storage()
@@ -207,7 +213,13 @@ impl QueueImpl {
         }
         let next_id_key = Symbol::new(&env, "next_id");
         let next_id: u32 = env.storage().persistent().get(&next_id_key).unwrap_or(1);
-        if next_id > config.max_positions {
+        let active_key = Symbol::new(&env, "active_count");
+        let active_count: u32 = env.storage().persistent().get(&active_key).unwrap_or(0);
+        // Capacity is checked against the number of *active* (non-cancelled) positions,
+        // not the monotonically increasing next_id. Otherwise cancelled positions would
+        // permanently consume capacity slots and a fully-cancelled queue could never
+        // accept new enrollments even though it has room.
+        if active_count >= config.max_positions {
             panic!("queue is full");
         }
         let pos = Position {
@@ -227,6 +239,10 @@ impl QueueImpl {
         env.storage()
             .persistent()
             .extend_ttl(&next_id_key, TTL_THRESHOLD, TTL_EXTEND_TO);
+        env.storage().persistent().set(&active_key, &(active_count + 1));
+        env.storage()
+            .persistent()
+            .extend_ttl(&active_key, TTL_THRESHOLD, TTL_EXTEND_TO);
         emit(
             &env,
             Symbol::new(&env, "Enrolled"),
@@ -252,6 +268,14 @@ impl QueueImpl {
         env.storage()
             .persistent()
             .extend_ttl(&key_pos, TTL_THRESHOLD, TTL_EXTEND_TO);
+        let active_key = Symbol::new(&env, "active_count");
+        let active_count: u32 = env.storage().persistent().get(&active_key).unwrap_or(0);
+        env.storage()
+            .persistent()
+            .set(&active_key, &active_count.saturating_sub(1));
+        env.storage()
+            .persistent()
+            .extend_ttl(&active_key, TTL_THRESHOLD, TTL_EXTEND_TO);
         emit(
             &env,
             Symbol::new(&env, "Cancelled"),
@@ -280,9 +304,20 @@ impl QueueImpl {
                 let mut advanced: Vec<u32> = Vec::new(&env);
                 let mut skipped: Vec<u32> = Vec::new(&env);
                 let mut idx: u32 = env.storage().persistent().get(&Symbol::new(&env, "idx")).unwrap_or(0);
+                // Bound the scan by the number of positions ever created (next_id - 1),
+                // not max_positions. Since active capacity (not next_id) is now checked
+                // at enroll time, positions can be assigned ids beyond max_positions once
+                // earlier slots are freed up by cancellations, so max_positions is no
+                // longer a valid upper bound on existing position ids.
+                let next_id: u32 = env
+                    .storage()
+                    .persistent()
+                    .get(&Symbol::new(&env, "next_id"))
+                    .unwrap_or(1);
+                let total_created = next_id.saturating_sub(1);
 
                 for _ in 0..batch_size {
-                    if idx >= config.max_positions {
+                    if idx >= total_created {
                         break;
                     }
                     let id = idx + 1;
@@ -364,6 +399,12 @@ impl QueueImpl {
         env.storage().persistent().get(&Symbol::new(&env, "idx")).unwrap_or(0)
     }
 
+    /// Returns the total number of positions *ever* created in this queue,
+    /// including positions that have since been cancelled. This is an
+    /// audit-trail figure — useful for reconstructing history of activity —
+    /// and must NOT be used for capacity/fill-rate checks. Use
+    /// `active_enrolled()` for the number of positions currently occupying
+    /// a capacity slot.
     pub fn total_enrolled(env: Env) -> u32 {
         let next_id: u32 = env
             .storage()
@@ -375,6 +416,17 @@ impl QueueImpl {
         } else {
             next_id - 1
         }
+    }
+
+    /// Returns the number of positions that currently occupy a capacity slot,
+    /// i.e. total ever enrolled minus cancelled positions. This is the value
+    /// that should be used for capacity/fill-rate checks and operator
+    /// dashboards, since cancelled positions free up their slot.
+    pub fn active_enrolled(env: Env) -> u32 {
+        env.storage()
+            .persistent()
+            .get(&Symbol::new(&env, "active_count"))
+            .unwrap_or(0)
     }
 
     pub fn close(env: Env, admin: Address) {
