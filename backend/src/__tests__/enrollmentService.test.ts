@@ -67,3 +67,13 @@ describe('getEnrollmentsByQueue', () => {
     expect(getEnrollmentsByQueue('queue-ghost')).toHaveLength(0);
   });
 });
+
+describe('createEnrollmentService isolation', () => {
+  it('does not report conflicts across separate stores', () => {
+    const first = createEnrollmentService(new MemoryAdapter());
+    const second = createEnrollmentService(new MemoryAdapter());
+
+    expect(first.enrollIdentity('shared-queue', 'shared-user').conflict).toBe(false);
+    expect(second.enrollIdentity('shared-queue', 'shared-user').conflict).toBe(false);
+  });
+});

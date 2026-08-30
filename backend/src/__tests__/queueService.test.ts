@@ -94,3 +94,14 @@ describe('getQueueStats', () => {
     expect(getQueueStats('ghost')).toBeUndefined();
   });
 });
+
+describe('createQueueService isolation', () => {
+  it('allows the same queue slug in separate stores', () => {
+    const first = createQueueService(new MemoryAdapter());
+    const second = createQueueService(new MemoryAdapter());
+    const payload = { name: 'Shared Queue', slug: 'shared-queue', maxPositions: 10 };
+
+    expect(first.createQueue(payload).id).toBe('shared-queue');
+    expect(second.createQueue(payload).id).toBe('shared-queue');
+  });
+});
