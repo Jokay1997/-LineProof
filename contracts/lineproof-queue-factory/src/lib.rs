@@ -1,3 +1,5 @@
+#![no_std]
+
 use soroban_sdk::{contract, contractimpl, contracttype, Address, BytesN, Env, Symbol, Vec};
 
 /// Storage key prefix for queue registry
