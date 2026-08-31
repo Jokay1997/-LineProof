@@ -15,7 +15,7 @@ documentation = "https://docs.lineproof.dev"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-soroban-sdk = { version = "22.0", default-features = false }
+soroban-sdk = "22.0"
 thiserror = "2"
 
 [dev-dependencies]
