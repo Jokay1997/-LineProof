@@ -5,7 +5,6 @@ const TTL_THRESHOLD: u32 = 10_000;
 /// TTL extension target: extend to this many ledgers (~1 year at 5s/ledger)
 const TTL_EXTEND_TO: u32 = 6_307_200;
 
-
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum EscrowStatus {
